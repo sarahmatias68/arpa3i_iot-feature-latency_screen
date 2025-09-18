@@ -32,9 +32,9 @@ export default function MainScreen({ navigation, user }) {
 
   const getColorForFallState = (state) => {
     switch (state) {
-        case 'Queda Detectada': return '#ef4444';
-        case 'Nenhuma Queda': return '#22c55e';
-        default: return '#6b7280';
+      case 'Queda Detectada': return '#ef4444';
+      case 'Conectado': return '#22c55e';
+      default: return '#6b7280';
     }
   };
 

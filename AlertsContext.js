@@ -47,6 +47,8 @@ export const AlertsProvider = ({ children, user }) => {
     socket.onopen = () => {
       console.log('✅ WebSocket conectado.');
       setConnectionStatus('Conectado');
+      setButtonState('Conectado'); // Botão ativo quando conectado
+      setFallState('Conectado'); // Detector de queda ativo quando conectado
       reconnectAttempts.current = 0;
       resetHeartbeat();
     };
@@ -62,7 +64,12 @@ export const AlertsProvider = ({ children, user }) => {
         } else if (data.type === 'botao' && data.status) {
           setButtonState(data.status);
         } else if (data.type === 'queda' && data.status) {
-          setFallState(data.status);
+          // Mantém o estado como 'Conectado' a menos que uma queda seja detectada
+          if (data.status === 'Queda Detectada') {
+            setFallState('Queda Detectada');
+          } else {
+            setFallState('Conectado');
+          }
         }
       } catch (error) {
         console.error('Erro ao processar mensagem:', error);
