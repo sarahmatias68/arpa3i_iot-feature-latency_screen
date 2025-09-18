@@ -18,13 +18,18 @@ export const AlertsProvider = ({ children, user }) => {
   const [connectionStatus, setConnectionStatus] = useState('Desconectado');
   const [sensorState, setSensorState] = useState('Servidor Desconectado');
   const [buttonState, setButtonState] = useState('Desconectado');
-  const [fallState, setFallState] = useState('Servidor Desconectado');
+  const [fallInfo, setFallInfo] = useState({ status: 'Servidor Desconectado', ambiente: null, alertId: null });
   const [activeAlert, setActiveAlert] = useState(null);
   const [allAlerts, setAllAlerts] = useState([]);
 
   const ws = useRef(null);
   const heartbeatTimeoutRef = useRef(null);
   const reconnectAttempts = useRef(0);
+  const fallInfoRef = useRef(fallInfo); // Usar ref para acessar o estado mais recente no onmessage
+
+  useEffect(() => {
+    fallInfoRef.current = fallInfo;
+  }, [fallInfo]);
 
   const connect = useCallback(() => {
     console.log(`Tentando conectar... (tentativa ${reconnectAttempts.current + 1})`);
@@ -39,7 +44,7 @@ export const AlertsProvider = ({ children, user }) => {
         setConnectionStatus('Desconectado');
         setSensorState('Servidor Desconectado');
         setButtonState('Desconectado');
-        setFallState('Servidor Desconectado');
+        setFallInfo({ status: 'Servidor Desconectado', ambiente: null, alertId: null });
         ws.current?.close();
       }, HEARTBEAT_TIMEOUT);
     };
@@ -47,8 +52,8 @@ export const AlertsProvider = ({ children, user }) => {
     socket.onopen = () => {
       console.log('✅ WebSocket conectado.');
       setConnectionStatus('Conectado');
-      setButtonState('Conectado'); // Botão ativo quando conectado
-      setFallState('Conectado'); // Detector de queda ativo quando conectado
+      setButtonState('Conectado');
+      setFallInfo({ status: 'Conectado', ambiente: null, alertId: null });
       reconnectAttempts.current = 0;
       resetHeartbeat();
     };
@@ -64,11 +69,16 @@ export const AlertsProvider = ({ children, user }) => {
         } else if (data.type === 'botao' && data.status) {
           setButtonState(data.status);
         } else if (data.type === 'queda' && data.status) {
-          // Mantém o estado como 'Conectado' a menos que uma queda seja detectada
+          // Se uma queda for detectada, atualiza o estado
           if (data.status === 'Queda Detectada') {
-            setFallState('Queda Detectada');
-          } else {
-            setFallState('Conectado');
+            setFallInfo({
+              status: 'Queda Detectada',
+              ambiente: data.ambiente || 'Não especificado',
+              alertId: data.id || null,
+            });
+          } else if (fallInfoRef.current.status !== 'Queda Detectada') {
+            // Só atualiza para 'Conectado' se não houver um alerta de queda ativo pendente
+            setFallInfo({ status: 'Conectado', ambiente: null, alertId: null });
           }
         }
       } catch (error) {
@@ -82,7 +92,7 @@ export const AlertsProvider = ({ children, user }) => {
       setConnectionStatus('Desconectado');
       setSensorState('Servidor Desconectado');
       setButtonState('Desconectado');
-      setFallState('Servidor Desconectado');
+      setFallInfo({ status: 'Servidor Desconectado', ambiente: null, alertId: null });
 
       if (reconnectAttempts.current < MAX_RECONNECT_ATTEMPTS) {
         const delay = RECONNECT_DELAY_BASE * Math.pow(2, reconnectAttempts.current);
@@ -110,12 +120,10 @@ export const AlertsProvider = ({ children, user }) => {
     };
   }, [user, connect]);
 
-  // Efeito para gerenciar a exibição de alertas modais
+  // Efeito para gerenciar a exibição de alertas modais (sem o de queda)
   useEffect(() => {
     if (buttonState === 'Apertado') {
       setActiveAlert({ title: 'Botão de Pânico Acionado', message: 'O botão de pânico foi pressionado. Verifique a situação imediatamente.' });
-    } else if (fallState === 'Queda Detectada') {
-      setActiveAlert({ title: 'Alerta de Queda', message: 'Uma possível queda foi detectada.' });
     } else if (sensorState === 'Gás e Fumaça Detectados') {
       setActiveAlert({ title: 'Alerta de Gás e Fumaça', message: 'Níveis perigosos de gás e fumaça foram detectados.' });
     } else if (sensorState === 'Fumaça Detectada') {
@@ -123,14 +131,10 @@ export const AlertsProvider = ({ children, user }) => {
     } else if (sensorState === 'Vazamento de Gás') {
       setActiveAlert({ title: 'Alerta de Gás', message: 'Um vazamento de gás foi detectado.' });
     }
-  }, [sensorState, buttonState, fallState]);
+  }, [sensorState, buttonState]);
 
   const dismissActiveAlert = () => {
     setActiveAlert(null);
-    // Força a reavaliação do estado dos botões/sensores após dispensar o alerta
-    // Isso garante que se o estado já normalizou, a UI reflita isso.
-    // A lógica do `useWebSocket` já deve ter atualizado os estados,
-    // então apenas fechar o modal fará com que a UI seja re-renderizada com os valores mais recentes.
   };
 
   const fetchAlerts = useCallback(async () => {
@@ -147,8 +151,8 @@ export const AlertsProvider = ({ children, user }) => {
 
   const acknowledgeAlertInList = async (id) => {
     if (!user) {
-        Alert.alert('Erro', 'Você precisa estar logado para confirmar um alerta.');
-        return;
+      Alert.alert('Erro', 'Você precisa estar logado para confirmar um alerta.');
+      return;
     }
     try {
       const response = await fetch(`${API_URL}/acknowledge`, {
@@ -168,16 +172,31 @@ export const AlertsProvider = ({ children, user }) => {
     }
   };
 
+  const acknowledgeFallAlert = async () => {
+    if (!user || !fallInfo.alertId) {
+      Alert.alert('Erro', 'Não há alerta de queda para confirmar ou você não está logado.');
+      return;
+    }
+    try {
+      await acknowledgeAlertInList(fallInfo.alertId);
+      // Após confirmar o alerta, reseta o estado do detector de quedas
+      setFallInfo({ status: 'Conectado', ambiente: null, alertId: null });
+    } catch (error) {
+      Alert.alert('Erro', `Não foi possível confirmar o alerta de queda: ${error.message}`);
+    }
+  };
+
   const value = {
     connectionStatus,
     sensorState,
     buttonState,
-    fallState,
+    fallInfo, // Alterado de fallState para fallInfo
     activeAlert,
     dismissActiveAlert,
     allAlerts,
     fetchAlerts,
     acknowledgeAlertInList,
+    acknowledgeFallAlert, // Nova função
   };
 
   return <AlertsContext.Provider value={value}>{children}</AlertsContext.Provider>;

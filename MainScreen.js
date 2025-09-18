@@ -7,9 +7,10 @@ export default function MainScreen({ navigation, user }) {
     connectionStatus,
     sensorState,
     buttonState,
-    fallState,
+    fallInfo, // Alterado de fallState para fallInfo
     activeAlert,
     dismissActiveAlert,
+    acknowledgeFallAlert, // Nova função
   } = useAlerts();
 
   const getColorForSensorState = (state) => {
@@ -30,8 +31,8 @@ export default function MainScreen({ navigation, user }) {
     }
   };
 
-  const getColorForFallState = (state) => {
-    switch (state) {
+  const getColorForFallInfo = (status) => {
+    switch (status) {
       case 'Queda Detectada': return '#ef4444';
       case 'Conectado': return '#22c55e';
       default: return '#6b7280';
@@ -48,13 +49,13 @@ export default function MainScreen({ navigation, user }) {
           transparent={true}
           animationType="fade"
           visible={Boolean(activeAlert)}
-          onRequestClose={dismissActiveAlert} // Usa a função do contexto
+          onRequestClose={dismissActiveAlert}
         >
           <View style={styles.modalContainer}>
             <View style={styles.modalView}>
               <Text style={styles.modalTitle}>{activeAlert.title}</Text>
               <Text style={styles.modalText}>{activeAlert.message}</Text>
-              <TouchableOpacity style={styles.modalButton} onPress={dismissActiveAlert}> // Usa a função do contexto
+              <TouchableOpacity style={styles.modalButton} onPress={dismissActiveAlert}>
                 <Text style={styles.modalButtonText}>OK, ESTOU CIENTE</Text>
               </TouchableOpacity>
             </View>
@@ -76,12 +77,18 @@ export default function MainScreen({ navigation, user }) {
         </Text>
       </View>
 
-      <View style={styles.card}>
+      <TouchableOpacity
+        style={[styles.card, { borderColor: getColorForFallInfo(fallInfo.status), borderWidth: fallInfo.status === 'Queda Detectada' ? 2 : 0 }]}
+        onPress={fallInfo.status === 'Queda Detectada' ? acknowledgeFallAlert : null}
+        activeOpacity={fallInfo.status === 'Queda Detectada' ? 0.7 : 1}
+      >
         <Text style={styles.title}>Detector de Queda</Text>
-        <Text style={[styles.status, { color: getColorForFallState(fallState) }]}>
-          {fallState}
+        <Text style={[styles.status, { color: getColorForFallInfo(fallInfo.status) }]}>
+          {fallInfo.status === 'Queda Detectada'
+            ? `Queda Detectada em:\n${fallInfo.ambiente}`
+            : 'Conectado'}
         </Text>
-      </View>
+      </TouchableOpacity>
 
       <TouchableOpacity style={styles.logsButton} onPress={() => navigation.navigate('History', { user: user })}>
         <Text style={styles.logsButtonText}>Histórico de Registros</Text>
