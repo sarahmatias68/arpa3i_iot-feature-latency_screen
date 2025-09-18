@@ -1,0 +1,11 @@
+name: 'Build Android'
+
+services:
+  android:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    volumes:
+      - ../:/home/src/app
+    stdin_open: true
+    tty: true

@@ -1,8 +1,8 @@
 import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
 import { Alert } from 'react-native';
 
-const WEBSOCKET_URL = 'ws://10.237.202.112:86/ws';
-const API_URL = 'http://10.237.202.112:86';
+const WEBSOCKET_URL = 'ws://b20acce3d6e6.ngrok-free.app/ws';
+const API_URL = 'https://b20acce3d6e6.ngrok-free.app';
 
 const HEARTBEAT_TIMEOUT = 15000;
 const RECONNECT_DELAY_BASE = 2000;
