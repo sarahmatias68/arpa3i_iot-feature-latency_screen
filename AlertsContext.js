@@ -57,6 +57,12 @@ export const AlertsProvider = ({ children, user }) => {
         const data = JSON.parse(event.data);
         if (data.type === 'ping') return;
 
+        // Handle alert updates
+        if (data.type === 'new_alert' || data.type === 'alert_acknowledged') {
+          console.log(`Received ${data.type}, refreshing alerts...`);
+          fetchAlerts();
+        }
+
         if (data.type === 'sensor' && data.tipo) {
           setSensorState(data.tipo);
         } else if (data.type === 'botao' && data.status) {
@@ -152,7 +158,7 @@ export const AlertsProvider = ({ children, user }) => {
       const result = await response.json();
       if (result.status === 'success') {
         Alert.alert('Sucesso', 'Alerta confirmado.');
-        fetchAlerts(); // Re-busca os alertas para atualizar a lista
+        // A atualização agora é tratada pelo WebSocket
       } else {
         throw new Error(result.message || 'Falha ao confirmar.');
       }
