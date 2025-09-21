@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { View, Text, TextInput, TouchableOpacity, StyleSheet, Alert, ActivityIndicator, KeyboardAvoidingView, TouchableWithoutFeedback, Keyboard, Platform } from 'react-native';
 
-const API_URL = 'https://e482f364dbe8.ngrok-free.app'; 
+const API_URL = 'http://192.168.2.115:86'; 
 
 const ForgotPasswordScreen = ({ navigation }) => {
   const [email, setEmail] = useState('');
