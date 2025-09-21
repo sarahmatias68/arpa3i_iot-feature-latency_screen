@@ -115,12 +115,6 @@ export const AlertsProvider = ({ children, user }) => {
       setActiveAlert({ title: 'Botão de Pânico Acionado', message: 'O botão de pânico foi pressionado. Verifique a situação imediatamente.' });
     } else if (fallState === 'Queda Detectada') {
       setActiveAlert({ title: 'Alerta de Queda', message: 'Uma possível queda foi detectada.' });
-    } else if (sensorState === 'Gás e Fumaça Detectados') {
-      setActiveAlert({ title: 'Alerta de Gás e Fumaça', message: 'Níveis perigosos de gás e fumaça foram detectados.' });
-    } else if (sensorState === 'Fumaça Detectada') {
-      setActiveAlert({ title: 'Alerta de Fumaça', message: 'Fumaça foi detectada no ambiente.' });
-    } else if (sensorState === 'Vazamento de Gás') {
-      setActiveAlert({ title: 'Alerta de Gás', message: 'Um vazamento de gás foi detectado.' });
     }
   }, [sensorState, buttonState, fallState]);
 
