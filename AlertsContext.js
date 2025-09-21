@@ -1,8 +1,8 @@
 import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
 import { Alert } from 'react-native';
 
-const WEBSOCKET_URL = 'ws://b20acce3d6e6.ngrok-free.app/ws';
-const API_URL = 'https://b20acce3d6e6.ngrok-free.app';
+const WEBSOCKET_URL = 'ws://192.168.2.115:86/ws';
+const API_URL = 'http://192.168.2.115:86';
 
 const HEARTBEAT_TIMEOUT = 15000;
 const RECONNECT_DELAY_BASE = 2000;
@@ -57,6 +57,12 @@ export const AlertsProvider = ({ children, user }) => {
         const data = JSON.parse(event.data);
         if (data.type === 'ping') return;
 
+        // Handle alert updates
+        if (data.type === 'new_alert' || data.type === 'alert_acknowledged') {
+          console.log(`Received ${data.type}, refreshing alerts...`);
+          fetchAlerts();
+        }
+
         if (data.type === 'sensor' && data.tipo) {
           setSensorState(data.tipo);
         } else if (data.type === 'botao' && data.status) {
@@ -109,12 +115,6 @@ export const AlertsProvider = ({ children, user }) => {
       setActiveAlert({ title: 'Botão de Pânico Acionado', message: 'O botão de pânico foi pressionado. Verifique a situação imediatamente.' });
     } else if (fallState === 'Queda Detectada') {
       setActiveAlert({ title: 'Alerta de Queda', message: 'Uma possível queda foi detectada.' });
-    } else if (sensorState === 'Gás e Fumaça Detectados') {
-      setActiveAlert({ title: 'Alerta de Gás e Fumaça', message: 'Níveis perigosos de gás e fumaça foram detectados.' });
-    } else if (sensorState === 'Fumaça Detectada') {
-      setActiveAlert({ title: 'Alerta de Fumaça', message: 'Fumaça foi detectada no ambiente.' });
-    } else if (sensorState === 'Vazamento de Gás') {
-      setActiveAlert({ title: 'Alerta de Gás', message: 'Um vazamento de gás foi detectado.' });
     }
   }, [sensorState, buttonState, fallState]);
 
@@ -152,7 +152,7 @@ export const AlertsProvider = ({ children, user }) => {
       const result = await response.json();
       if (result.status === 'success') {
         Alert.alert('Sucesso', 'Alerta confirmado.');
-        fetchAlerts(); // Re-busca os alertas para atualizar a lista
+        // A atualização agora é tratada pelo WebSocket
       } else {
         throw new Error(result.message || 'Falha ao confirmar.');
       }

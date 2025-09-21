@@ -3,7 +3,7 @@ import { View, Text, StyleSheet, FlatList, ActivityIndicator, RefreshControl, To
 import { useFocusEffect } from '@react-navigation/native';
 import { useMemo } from 'react';
 
-const API_URL = 'https://b20acce3d6e6.ngrok-free.app';
+const API_URL = 'http://192.168.2.115:86';
 
 const getAlertColor = (type) => {
   switch (type) {

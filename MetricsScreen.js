@@ -1,7 +1,7 @@
 import { View, Text, StyleSheet, ScrollView } from 'react-native';
 import useWebSocket from './useWebSocketSensor';
 
-const WEBSOCKET_URL = 'ws://b20acce3d6e6.ngrok-free.app/ws';
+const WEBSOCKET_URL = 'ws://192.168.2.115:86/ws';
 
 export default function MetricsScreen() {
   const { metricsState} = useWebSocket(WEBSOCKET_URL);
