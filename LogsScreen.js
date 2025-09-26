@@ -3,7 +3,7 @@ import { View, Text, StyleSheet, FlatList, ActivityIndicator, RefreshControl, To
 import { useFocusEffect } from '@react-navigation/native';
 import { useMemo } from 'react';
 
-const API_URL = 'http://192.168.2.115:86';
+const API_URL = 'http://092bcd581463.ngrok-free.app';
 
 const getAlertColor = (type) => {
   switch (type) {
@@ -47,6 +47,8 @@ export default function LogsScreen({ route }) {
     setIsLoading(true);
     try {
       const response = await fetch(`${API_URL}/alerts`);
+
+      console.info(response);
       if (!response.ok) throw new Error('Falha na resposta do servidor.');
       const data = await response.json();
       setAllAlerts(data);

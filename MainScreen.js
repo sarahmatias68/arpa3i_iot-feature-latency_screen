@@ -1,6 +1,6 @@
 import { View, Text, StyleSheet, StatusBar, Modal, TouchableOpacity } from 'react-native';
 import { useAlerts } from './AlertsContext'; // Importa o hook do contexto
-import ConnectionStatusBanner from './ConnectionStatusBanner';
+import { ConnectionStatusBanner } from './ConnectionStatusBanner';
 
 export default function MainScreen({ navigation, user }) {
   const {
@@ -48,13 +48,13 @@ export default function MainScreen({ navigation, user }) {
           transparent={true}
           animationType="fade"
           visible={Boolean(activeAlert)}
-          onRequestClose={dismissActiveAlert} // Usa a função do contexto
+          onRequestClose={dismissActiveAlert}
         >
           <View style={styles.modalContainer}>
             <View style={styles.modalView}>
               <Text style={styles.modalTitle}>{activeAlert.title}</Text>
               <Text style={styles.modalText}>{activeAlert.message}</Text>
-              <TouchableOpacity style={styles.modalButton} onPress={dismissActiveAlert}> // Usa a função do contexto
+              <TouchableOpacity style={styles.modalButton} onPress={dismissActiveAlert}>
                 <Text style={styles.modalButtonText}>OK, ESTOU CIENTE</Text>
               </TouchableOpacity>
             </View>

@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { View, Text, TextInput, TouchableOpacity, StyleSheet, Alert, ActivityIndicator, KeyboardAvoidingView, TouchableWithoutFeedback, Keyboard, Platform } from 'react-native';
 
-const API_URL = 'http://192.168.2.115:86'; 
+const API_URL = 'http://092bcd581463.ngrok-free.app'; 
 
 const SignUpScreen = ({ navigation }) => {
   const [name, setName] = useState('');

@@ -1,0 +1,21 @@
+# Cursor Rules
+
+## Commit Messages
+- Always generate commit messages in English.
+- When I click "Generate commit message", ensure the commit text is in English.
+- Use imperative mood and be concise in the subject line (max 72 chars).
+- Optionally include a short body explaining the what and why (not how).
+- Avoid emojis unless explicitly requested.
+
+### Examples
+- chore: update docker-compose and gitignore for postgres
+    - Change postgres volume mount path to match bitnami image structure
+    - Update healthcheck to use correct environment variables
+    - Add postgres_data directory to gitignore
+    
+- feat: add feedback system and analytics routes
+    - refactor: migrate metrics to analytics and update database schema
+    - style: clean up unused UI components and update dependencies
+    - fix: adjust docker-compose and PostgreSQL configuration
+    - chore: update package.json dependencies and remove unused files
+- chore: update Docker Compose service names for nginx
