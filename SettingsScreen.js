@@ -8,7 +8,7 @@ const SettingsScreen = ({ navigation, onLogout }) => {
     { title: 'Gerenciar Usuários', screen: 'UserList', icon: 'people-outline' },
     { title: 'Permissões', screen: 'Permissions', icon: 'lock-closed-outline' },
     { title: 'Sobre o Aplicativo', screen: 'About', icon: 'information-circle-outline' },
-    { title: 'Métricas de Desempenho', screen: 'Metrics', icon: 'stats-chart-outline' },
+    // { title: 'Métricas de Desempenho', screen: 'Metrics', icon: 'stats-chart-outline' },
   ];
 
   return (
