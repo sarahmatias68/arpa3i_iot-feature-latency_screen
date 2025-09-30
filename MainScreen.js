@@ -1,5 +1,5 @@
 import { View, Text, StyleSheet, StatusBar, Modal, TouchableOpacity } from 'react-native';
-import { useAlerts } from './AlertsContext'; // Importa o hook do contexto
+import { useAlerts } from './AlertsContext';
 import { ConnectionStatusBanner } from './ConnectionStatusBanner';
 
 export default function MainScreen({ navigation, user }) {
@@ -17,7 +17,6 @@ export default function MainScreen({ navigation, user }) {
       case 'Ambiente Seguro': return '#22c55e';
       case 'Vazamento de Gás': return '#facc15';
       case 'Fumaça Detectada': return '#ef4444';
-      case 'Gás e Fumaça Detectados': return '#a855f7';
       default: return '#6b7280';
     }
   };
@@ -30,12 +29,23 @@ export default function MainScreen({ navigation, user }) {
     }
   };
 
+  // FUNÇÃO DE COR ATUALIZADA
   const getColorForFallState = (state) => {
-    switch (state) {
-        case 'Queda Detectada': return '#ef4444';
-        case 'Nenhuma Queda': return '#22c55e';
-        default: return '#6b7280';
+    if (typeof state === 'object' && state.status === 'Queda Detectada') {
+      return '#ef4444'; // Vermelho
     }
+    switch (state) {
+      case 'Nenhuma Queda': return '#22c55e'; // Verde
+      default: return '#6b7280'; // Cinza (para "Desconectado")
+    }
+  };
+
+  // NOVA FUNÇÃO PARA RENDERIZAR O TEXTO
+  const renderFallStatus = () => {
+    if (typeof fallState === 'object' && fallState !== null) {
+      return `Queda: ${fallState.dispositivo} (${fallState.comodo})`;
+    }
+    return fallState;
   };
 
   return (
@@ -76,10 +86,11 @@ export default function MainScreen({ navigation, user }) {
         </Text>
       </View>
 
+      {/* CARD DO DETECTOR DE QUEDA ATUALIZADO */}
       <View style={styles.card}>
         <Text style={styles.title}>Detector de Queda</Text>
         <Text style={[styles.status, { color: getColorForFallState(fallState) }]}>
-          {fallState}
+          {renderFallStatus()}
         </Text>
       </View>
 
@@ -117,61 +128,5 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     textAlign: 'center',
   },
-  modalContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: 'rgba(0, 0, 0, 0.6)',
-  },
-  modalView: {
-    margin: 20,
-    backgroundColor: '#1f2937',
-    borderRadius: 20,
-    padding: 35,
-    alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.25,
-    shadowRadius: 4,
-    elevation: 5,
-    borderWidth: 1,
-    borderColor: '#ef4444',
-  },
-  modalTitle: {
-    fontSize: 22,
-    fontWeight: 'bold',
-    color: '#f9fafb',
-    marginBottom: 15,
-    textAlign: 'center',
-  },
-  modalText: {
-    marginBottom: 20,
-    textAlign: 'center',
-    fontSize: 18,
-    color: '#f9fafb',
-  },
-  modalButton: {
-    backgroundColor: '#ef4444',
-    borderRadius: 10,
-    paddingVertical: 10,
-    paddingHorizontal: 20,
-    elevation: 2,
-  },
-  modalButtonText: {
-    color: 'white',
-    fontWeight: 'bold',
-    textAlign: 'center',
-  },
-  logsButton: {
-    marginTop: 20,
-    backgroundColor: '#374151',
-    paddingVertical: 12,
-    paddingHorizontal: 30,
-    borderRadius: 10,
-  },
-  logsButtonText: {
-    color: '#f9fafb',
-    fontSize: 16,
-    fontWeight: 'bold',
-  },
+  // ... (o resto dos seus estilos continua igual)
 });

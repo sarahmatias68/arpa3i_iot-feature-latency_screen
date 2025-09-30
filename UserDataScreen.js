@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, TextInput, StyleSheet, TouchableOpacity, Alert, ScrollView, KeyboardAvoidingView, Platform } from 'react-native';
 
-const API_URL = 'http://092bcd581463.ngrok-free.app';
+const API_URL = 'http://192.168.2.115:86';
 
 const UserDataScreen = ({ user }) => {
   const [name, setName] = useState('');

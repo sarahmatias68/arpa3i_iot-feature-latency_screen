@@ -3,7 +3,7 @@ import { View, Text, StyleSheet, FlatList, TouchableOpacity, Alert, ActivityIndi
 import { useFocusEffect } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 
-const API_URL = 'http://092bcd581463.ngrok-free.app';
+const API_URL = 'http://192.168.2.115:86';
 
 const UserListScreen = () => {
   const [users, setUsers] = useState([]);
