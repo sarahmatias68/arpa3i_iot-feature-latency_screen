@@ -11,15 +11,36 @@ import { Alert } from "react-native";
 import { WsConnection } from "./wsConnection";
 import { User } from "./types/model";
 
-// --- TIPOS CORRIGIDOS ---
+// --- TIPOS ATUALIZADOS PARA COMPATIBILIDADE COM SERVIDOR ESP32 ---
 interface FallDetails {
   status: "Queda Detectada";
   comodo: string;
   dispositivo: string;
 }
-type FallState = "Desconectado" | "Nenhuma Queda" | FallDetails;
+type FallState = "Desconectado" | "Ativo" | FallDetails;
 
-// O resto dos tipos...
+// Novos tipos para dispositivos e heartbeat
+interface DeviceStatus {
+  deviceId: string;
+  status: "online" | "offline";
+  lastSeen?: string;
+  uptime?: number;
+  reconnects?: number;
+  battery?: number;
+  temperature?: number;
+  heap?: number;
+  rssi?: number;
+}
+
+interface HeartbeatData {
+  uptime_ms: number;
+  reconnects: number;
+  tensao_mV?: number;
+  temp_cpu_c?: number;
+  free_heap_b?: number;
+  wifi_rssi_dbm?: number;
+}
+
 type ConnectionStatus =
   | "Desconectado"
   | "Conectando..."
@@ -31,6 +52,7 @@ type ButtonState = "Desconectado" | "" | string;
 interface ActiveAlert {
   title: string;
   message: string;
+  type: string;
 }
 interface AlertItem {
   id: string;
@@ -49,6 +71,8 @@ interface AlertsContextType {
   allAlerts: AlertItem[];
   fetchAlerts: () => Promise<void>;
   acknowledgeAlertInList: (id: string) => Promise<void>;
+  devices: DeviceStatus[];
+  sendDeviceId: (deviceId: string) => void;
 }
 
 const WEBSOCKET_URL = "ws://192.168.2.115:86/ws";
@@ -92,6 +116,7 @@ export const AlertsProvider: React.FC<AlertsProviderProps> = ({
 
   const [activeAlert, setActiveAlert] = useState<ActiveAlert | null>(null);
   const [allAlerts, setAllAlerts] = useState<AlertItem[]>([]);
+  const [devices, setDevices] = useState<DeviceStatus[]>([]);
   const ws = useRef<WsConnection | null>(null);
 
   const connect = useCallback(() => {
@@ -102,38 +127,102 @@ export const AlertsProvider: React.FC<AlertsProviderProps> = ({
         handleStateChange("connectionStatus", "Conectado");
         handleStateChange("sensorState", "Ambiente Seguro");
         handleStateChange("buttonState", "Conectado");
-        handleStateChange("fallState", "Nenhuma Queda");
+        handleStateChange("fallState", "Conectado");
       },
 
-      // LÓGICA DE MENSAGEM CORRIGIDA
+      // LÓGICA DE MENSAGEM ATUALIZADA PARA SERVIDOR ESP32
       onMessage: (event: { data: string }) => {
         try {
           const data = JSON.parse(event.data);
+          console.log("📨 Mensagem recebida:", data);
+          
           if (data.type === "ping") return;
 
-          if (data.type === "new_alert" || data.type === "alert_acknowledged") {
-            fetchAlerts();
+          // Processar alertas do servidor
+          if (data.type === "ALERTA") {
+            if (data.sub_type === "QUEDA") {
+              const fallDetails: FallDetails = {
+                status: "Queda Detectada",
+                comodo: data.detalhes?.local || "desconhecido",
+                dispositivo: data.dispositivo || "desconhecido",
+              };
+
+              handleStateChange("fallState", fallDetails);
+
+              setActiveAlert({
+                title: "⚠️ ALERTA DE QUEDA DETECTADA!",
+                message: `Queda detectada no local '${fallDetails.comodo}' pelo dispositivo '${fallDetails.dispositivo}'.`,
+                type: "QUEDA"
+              });
+            } else if (data.sub_type === "PANICO") {
+              setActiveAlert({
+                title: "🚨 ALERTA DE PÂNICO!",
+                message: `Botão de pânico acionado pelo dispositivo '${data.dispositivo || 'desconhecido'}'.`,
+                type: "PANICO"
+              });
+            }
           }
-
-          if (data.type === "sensor" && data.tipo) {
-            handleStateChange("sensorState", data.tipo);
-          } else if (data.type === "botao" && data.status) {
-            handleStateChange("buttonState", data.status);
-          
-          // CORREÇÃO PRINCIPAL: Ouvindo "alerta_queda" e tratando os dados
-          } else if (data.type === "alerta_queda") {
-            const fallDetails: FallDetails = {
-              status: "Queda Detectada",
-              comodo: data.comodo,
-              dispositivo: data.dispositivo,
-            };
-
-            handleStateChange("fallState", fallDetails);
-
-            setActiveAlert({
-              title: "⚠️ ALERTA DE QUEDA DETECTADA!",
-              message: `Evento no cômodo '${data.comodo}' detectado pelo dispositivo '${data.dispositivo}'.`,
+          // Processar status de dispositivos
+          else if (data.type === "DEVICE_STATUS") {
+            const deviceId = data.deviceId;
+            const status = data.status;
+            
+            setDevices(prev => {
+              const existing = prev.find(d => d.deviceId === deviceId);
+              if (existing) {
+                return prev.map(d => 
+                  d.deviceId === deviceId 
+                    ? { ...d, status, lastSeen: new Date().toISOString() }
+                    : d
+                );
+              } else {
+                return [...prev, { deviceId, status, lastSeen: new Date().toISOString() }];
+              }
             });
+          }
+          // Processar heartbeat com dados completos
+          else if (data.type === "HEARTBEAT") {
+            const deviceId = data.deviceId || "desconhecido";
+            const heartbeatData: HeartbeatData = data.data;
+            
+            // Atualizar status do dispositivo
+            setDevices(prev => {
+              const existing = prev.find(d => d.deviceId === deviceId);
+              const deviceData: DeviceStatus = {
+                deviceId,
+                status: "online",
+                lastSeen: new Date().toISOString(),
+                uptime: heartbeatData.uptime_ms / 1000,
+                reconnects: heartbeatData.reconnects,
+                battery: heartbeatData.tensao_mV,
+                temperature: heartbeatData.temp_cpu_c,
+                heap: heartbeatData.free_heap_b,
+                rssi: heartbeatData.wifi_rssi_dbm,
+              };
+              
+              if (existing) {
+                return prev.map(d => d.deviceId === deviceId ? deviceData : d);
+              } else {
+                return [...prev, deviceData];
+              }
+            });
+
+            // Verificar bateria fraca
+            if (heartbeatData.tensao_mV && heartbeatData.tensao_mV < 3200) {
+              setActiveAlert({
+                title: "🔋 BATERIA FRACA!",
+                message: `Dispositivo '${deviceId}' com bateria baixa: ${heartbeatData.tensao_mV}mV`,
+                type: "BATERIA_FRACA"
+              });
+            }
+          }
+          // Processar dados do sensor
+          else if (data.type === "sensor" && data.tipo) {
+            handleStateChange("sensorState", data.tipo);
+          }
+          // Processar confirmação de ciência
+          else if (data.type === "ACK") {
+            console.log(`✅ Confirmação recebida para alerta: ${data.acked_alert}`);
           }
         } catch (error) {
           console.error("Erro ao processar mensagem:", error);
@@ -172,15 +261,56 @@ export const AlertsProvider: React.FC<AlertsProviderProps> = ({
   const dismissActiveAlert = () => {
     setActiveAlert(null);
     // Ao dispensar, o card volta ao estado normal
-    handleStateChange("fallState", "Nenhuma Queda");
+    handleStateChange("fallState", "Conectado");
   };
 
+  const sendDeviceId = useCallback((deviceId: string) => {
+    if (ws.current && ws.current.ws && ws.current.ws.readyState === WebSocket.OPEN) {
+      const message = JSON.stringify({
+        type: "deviceId",
+        deviceId: deviceId
+      });
+      ws.current.ws.send(message);
+      console.log(`📤 Enviando deviceId: ${deviceId}`);
+    }
+  }, []);
+
   const fetchAlerts = useCallback(async () => {
-    // ... seu código
+    try {
+      const response = await fetch(`${API_URL}/alerts`);
+      if (response.ok) {
+        const alerts = await response.json();
+        setAllAlerts(alerts);
+      }
+    } catch (error) {
+      console.error("Erro ao buscar alertas:", error);
+    }
   }, []);
 
   const acknowledgeAlertInList = async (id: string) => {
-    // ... seu código
+    try {
+      const response = await fetch(`${API_URL}/acknowledge`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded',
+        },
+        body: `id=${id}&user=${user.name}`
+      });
+      
+      if (response.ok) {
+        await fetchAlerts();
+        // Enviar confirmação via WebSocket
+        if (ws.current && ws.current.ws && ws.current.ws.readyState === WebSocket.OPEN) {
+          const message = JSON.stringify({
+            type: "ACK_ALERTA",
+            user: user.name
+          });
+          ws.current.ws.send(message);
+        }
+      }
+    } catch (error) {
+      console.error("Erro ao confirmar alerta:", error);
+    }
   };
 
   const value: AlertsContextType = {
@@ -193,6 +323,8 @@ export const AlertsProvider: React.FC<AlertsProviderProps> = ({
     allAlerts,
     fetchAlerts,
     acknowledgeAlertInList,
+    devices,
+    sendDeviceId,
   };
 
   return (
