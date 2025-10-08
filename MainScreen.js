@@ -1,19 +1,22 @@
-import { View, Text, StyleSheet, StatusBar, Modal, TouchableOpacity, ScrollView } from 'react-native';
+import { View, Text, StyleSheet, StatusBar, TouchableOpacity, ScrollView } from 'react-native';
+import { useState } from 'react';
 import { useAlerts } from './AlertsContext';
 import { ConnectionStatusBanner } from './ConnectionStatusBanner';
-import AlertStatusCard from './AlertStatusCard';
+import DeviceTypeSelector from './DeviceTypeSelector';
 
 export default function MainScreen({ navigation, user }) {
   const {
     connectionStatus,
     sensorState,
-    buttonState,
-    fallState,
-    activeAlert,
-    dismissActiveAlert,
-    devices,
-    sendDeviceId,
+    deviceTypes,
+    updateDeviceType,
+    getDevicesByType,
+    getNewDevices,
+    acknowledgeAlert, // <<-- Usando a nova função unificada
   } = useAlerts();
+
+  const [typeSelectorVisible, setTypeSelectorVisible] = useState(false);
+  const [selectedDeviceId, setSelectedDeviceId] = useState(null);
 
   const getColorForSensorState = (state) => {
     switch (state) {
@@ -24,172 +27,188 @@ export default function MainScreen({ navigation, user }) {
     }
   };
 
-  const getColorForButtonState = (state) => {
-    switch (state) {
-      case 'Apertado': return '#ef4444';
-      case 'Conectado': return '#22c55e';
-      default: return '#6b7280';
-    }
+  const getBatteryColor = (battery) => {
+    if (battery == null) return '#6b7280';
+    if (battery <= 2800) return '#ef4444';
+    if (battery <= 3600) return '#facc15';
+    return '#22c55e';
   };
 
-  // FUNÇÃO DE COR ATUALIZADA
-  const getColorForFallState = (state) => {
-    if (typeof state === 'object' && state.status === 'Queda Detectada') {
-      return '#ef4444'; // Vermelho
-    }
-    switch (state) {
-      case 'Conectado': return '#22c55e'; // Verde
-      default: return '#6b7280'; // Cinza (para "Desconectado")
-    }
-  };
+  const pulseiraDevices = getDevicesByType('pulseira');
+  const barreiraDevices = getDevicesByType('barreira');
+  const detectorDevices = getDevicesByType('detector');
+  const microondasDevices = getDevicesByType('microondas');
+  const outrosDevices = getDevicesByType('outros');
+  const newDevices = getNewDevices();
 
-  // NOVA FUNÇÃO PARA RENDERIZAR O TEXTO
-  const renderFallStatus = () => {
-    if (typeof fallState === 'object' && fallState !== null) {
-      return `Queda: ${fallState.dispositivo} (${fallState.comodo})`;
-    }
-    return fallState;
-  };
-
-  // Função para renderizar dispositivos conectados
   const renderDeviceCard = (device) => {
-    const getDeviceColor = (status) => {
-      switch (status) {
-        case 'online': return '#22c55e';
-        case 'offline': return '#ef4444';
-        default: return '#6b7280';
-      }
-    };
+    const deviceType = deviceTypes.find(t => t.id === device.deviceType);
+    const typeConfig = deviceType || { name: "Sem tipo", color: "#6b7280", icon: "❓" };
 
-    const formatUptime = (uptime) => {
-      if (!uptime) return 'N/A';
-      const hours = Math.floor(uptime / 3600);
-      const minutes = Math.floor((uptime % 3600) / 60);
-      return `${hours}h ${minutes}m`;
-    };
+    const statusText = device.connected ? 'Online' : 'Offline';
+    const statusColor = device.connected ? '#22c55e' : '#6b7280';
+    
+    // <<-- CORREÇÃO: Lógica unificada para qualquer tipo de alerta -->>
+    const isAlertActive = !!device.lastAlertType;
+    const alertStyle = 
+        device.lastAlertType === 'PANICO' ? styles.cardPanicActive :
+        device.lastAlertType === 'QUEDA' ? styles.cardFallActive : null;
+    
+    const alertStatusText = 
+        device.lastAlertType === 'PANICO' ? 'BOTÃO ACIONADO' :
+        device.lastAlertType === 'QUEDA' ? 'QUEDA DETECTADA' : statusText;
 
-    const getBatteryColor = (battery) => {
-      if (!battery) return '#6b7280';
-      if (battery < 3200) return '#ef4444';
-      if (battery < 3600) return '#facc15';
-      return '#22c55e';
-    };
+    const alertStatusColor = 
+        device.lastAlertType === 'PANICO' ? '#ef4444' :
+        device.lastAlertType === 'QUEDA' ? '#f59e0b' : statusColor;
+
 
     return (
-      <View key={device.deviceId} style={styles.deviceCard}>
+      <TouchableOpacity 
+        key={device.deviceId} 
+        style={[styles.subCard, alertStyle]}
+        // <<-- CORREÇÃO: Chama a função unificada ao tocar no card em alerta -->>
+        onPress={isAlertActive ? () => acknowledgeAlert(device.deviceId, device.lastAlertType) : undefined}
+        activeOpacity={isAlertActive ? 0.7 : 1}
+      >
         <View style={styles.deviceHeader}>
-          <Text style={styles.deviceTitle}>{device.deviceId}</Text>
-          <View style={[styles.deviceStatus, { backgroundColor: getDeviceColor(device.status) }]}>
-            <Text style={styles.deviceStatusText}>
-              {device.status === 'online' ? 'ONLINE' : 'OFFLINE'}
-            </Text>
-          </View>
+          <Text style={styles.subTitle} numberOfLines={1} ellipsizeMode="tail">{device.deviceId}</Text>
+          <TouchableOpacity 
+            style={[styles.typeButton, { backgroundColor: typeConfig.color }]}
+            onPress={() => showTypeSelector(device.deviceId)}
+          >
+            <Text style={styles.typeButtonText}>{typeConfig.icon} {typeConfig.name}</Text>
+          </TouchableOpacity>
         </View>
-        
-        {device.status === 'online' && (
-          <View style={styles.deviceInfo}>
-            {device.uptime && (
-              <Text style={styles.deviceInfoText}>
-                ⏱️ Uptime: {formatUptime(device.uptime)}
+        <Text style={[styles.subStatus, { color: alertStatusColor }]}>
+          {alertStatusText}
+        </Text>
+        {device.connected && (
+          <View style={styles.deviceInfoBlock}>
+            {typeof device.batteryMv === 'number' && (
+              <Text style={[styles.deviceInfoText, { color: getBatteryColor(device.batteryMv) }]}>
+                Bateria: {device.batteryMv} mV
               </Text>
             )}
-            {device.battery && (
-              <Text style={[styles.deviceInfoText, { color: getBatteryColor(device.battery) }]}>
-                🔋 Bateria: {device.battery}mV
+            {typeof device.uptimeSec === 'number' && (
+              <Text style={styles.deviceInfoText}>
+                Uptime: {Math.floor(device.uptimeSec/3600)}h {Math.floor((device.uptimeSec%3600)/60)}m
               </Text>
             )}
-            {device.temperature && (
-              <Text style={styles.deviceInfoText}>
-                🌡️ Temp: {device.temperature.toFixed(1)}°C
-              </Text>
+            {typeof device.rssiDbm === 'number' && (
+              <Text style={styles.deviceInfoText}>WiFi: {device.rssiDbm} dBm</Text>
             )}
-            {device.rssi && (
-              <Text style={styles.deviceInfoText}>
-                📶 WiFi: {device.rssi}dBm
-              </Text>
+            {typeof device.tempCpuC === 'number' && (
+              <Text style={styles.deviceInfoText}>CPU: {device.tempCpuC}°C</Text>
+            )}
+            {typeof device.heapB === 'number' && (
+              <Text style={styles.deviceInfoText}>Heap: {device.heapB} B</Text>
             )}
             {device.reconnects !== undefined && (
-              <Text style={styles.deviceInfoText}>
-                🔄 Reconexões: {device.reconnects}
-              </Text>
+              <Text style={styles.deviceInfoText}>Reconexões: {device.reconnects}</Text>
             )}
           </View>
         )}
-      </View>
+        {isAlertActive && (
+          <Text style={[styles.ackHint, { color: alertStatusColor }]}>Toque para marcar como ciente</Text>
+        )}
+      </TouchableOpacity>
     );
   };
 
+  const showTypeSelector = (deviceId) => {
+    setSelectedDeviceId(deviceId);
+    setTypeSelectorVisible(true);
+  };
+
+  const handleTypeSelection = async (typeId) => {
+    if (selectedDeviceId) {
+      await updateDeviceType(selectedDeviceId, typeId);
+    }
+    setTypeSelectorVisible(false);
+    setSelectedDeviceId(null);
+  };
+
+  const renderDeviceGroup = (devices) => {
+    if (devices.length === 0) return null;
+    return devices.map(device => renderDeviceCard(device));
+  }
+  
   return (
     <View style={styles.container}>
       <StatusBar barStyle="light-content" />
       <ConnectionStatusBanner status={connectionStatus} />
-
-      {activeAlert && (
-        <Modal
-          transparent={true}
-          animationType="fade"
-          visible={Boolean(activeAlert)}
-          onRequestClose={dismissActiveAlert}
-        >
-          <View style={styles.modalContainer}>
-            <View style={styles.modalView}>
-              <Text style={styles.modalTitle}>{activeAlert.title}</Text>
-              <Text style={styles.modalText}>{activeAlert.message}</Text>
-              <TouchableOpacity style={styles.modalButton} onPress={dismissActiveAlert}>
-                <Text style={styles.modalButtonText}>OK, ESTOU CIENTE</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-        </Modal>
-      )}
 
       <ScrollView 
         style={styles.scrollView}
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
       >
-        {/* CARD DE ALERTA ATIVO */}
-        {activeAlert && (
-          <AlertStatusCard 
-            activeAlert={activeAlert} 
-            onDismiss={dismissActiveAlert} 
-          />
-        )}
-
         <View style={styles.card}>
           <Text style={styles.title}>Status do Ambiente</Text>
           <Text style={[styles.status, { color: getColorForSensorState(sensorState) }]}>
-            {sensorState}
+            {sensorState || 'Indisponível'}
           </Text>
         </View>
 
-        <View style={styles.card}>
-          <Text style={styles.title}>Botão de Pânico</Text>
-          <Text style={[styles.status, { color: getColorForButtonState(buttonState) }]}>
-            {buttonState}
-          </Text>
-        </View>
+        {newDevices.length > 0 && (
+          <View style={styles.cardSection}>
+            <Text style={styles.sectionHeader}>🔧 Dispositivos Novos</Text>
+            <Text style={styles.sectionSubtitle}>
+              Estes dispositivos precisam ter o tipo definido
+            </Text>
+            {renderDeviceGroup(newDevices)}
+          </View>
+        )}
+        
+        {pulseiraDevices.length > 0 && (
+          <View style={styles.cardSection}>
+            <Text style={styles.sectionHeader}>Pulseiras Assistivas</Text>
+            {renderDeviceGroup(pulseiraDevices)}
+          </View>
+        )}
 
-        {/* CARD DO DETECTOR DE QUEDA ATUALIZADO */}
-        <View style={styles.card}>
-          <Text style={styles.title}>Detector de Queda</Text>
-          <Text style={[styles.status, { color: getColorForFallState(fallState) }]}>
-            {renderFallStatus()}
-          </Text>
-        </View>
+        {detectorDevices.length > 0 && (
+          <View style={styles.cardSection}>
+            <Text style={styles.sectionHeader}>Detectores de Queda</Text>
+            {renderDeviceGroup(detectorDevices)}
+          </View>
+        )}
 
-        {/* CARDS DE DISPOSITIVOS CONECTADOS */}
-        {devices.length > 0 && (
-          <View style={styles.devicesSection}>
-            <Text style={styles.sectionTitle}>Dispositivos Conectados</Text>
-            {devices.map(renderDeviceCard)}
+        {barreiraDevices.length > 0 && (
+          <View style={styles.cardSection}>
+            <Text style={styles.sectionHeader}>Barreiras</Text>
+            {renderDeviceGroup(barreiraDevices)}
+          </View>
+        )}
+        
+        {microondasDevices.length > 0 && (
+          <View style={styles.cardSection}>
+            <Text style={styles.sectionHeader}>Micro-ondas</Text>
+            {renderDeviceGroup(microondasDevices)}
+          </View>
+        )}
+
+        {outrosDevices.length > 0 && (
+          <View style={styles.cardSection}>
+            <Text style={styles.sectionHeader}>Outros Dispositivos</Text>
+            {renderDeviceGroup(outrosDevices)}
           </View>
         )}
 
         <TouchableOpacity style={styles.logsButton} onPress={() => navigation.navigate('History', { user: user })}>
           <Text style={styles.logsButtonText}>Histórico de Registros</Text>
         </TouchableOpacity>
+
       </ScrollView>
+
+      <DeviceTypeSelector
+        visible={typeSelectorVisible}
+        onClose={() => setTypeSelectorVisible(false)}
+        onSelectType={handleTypeSelection}
+        deviceTypes={deviceTypes}
+        deviceId={selectedDeviceId}
+      />
     </View>
   );
 }
@@ -203,9 +222,8 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   scrollContent: {
-    alignItems: 'center',
     padding: 20,
-    gap: 20,
+    paddingBottom: 40,
   },
   card: {
     backgroundColor: '#1f2937',
@@ -213,6 +231,71 @@ const styles = StyleSheet.create({
     padding: 25,
     width: '100%',
     alignItems: 'center',
+    marginBottom: 20,
+  },
+  cardSection: {
+    backgroundColor: '#1f2937',
+    borderRadius: 12,
+    padding: 20,
+    width: '100%',
+    marginBottom: 20,
+  },
+  sectionHeader: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#f9fafb',
+    marginBottom: 5,
+  },
+  sectionSubtitle: {
+    fontSize: 14,
+    color: '#9ca3af',
+    marginBottom: 10,
+    fontStyle: 'italic',
+  },
+  deviceHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  typeButton: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 8,
+  },
+  typeButtonText: {
+    color: '#ffffff',
+    fontSize: 12,
+    fontWeight: 'bold',
+    textAlign: 'center',
+  },
+  subCard: {
+    backgroundColor: '#111827',
+    borderRadius: 10,
+    padding: 16,
+    marginTop: 10,
+    borderWidth: 1,
+    borderColor: '#374151',
+  },
+  subTitle: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#f3f4f6',
+    flex: 1,
+    marginRight: 8,
+  },
+  subStatus: {
+    marginTop: 6,
+    fontSize: 14,
+    fontWeight: 'bold',
+  },
+  deviceInfoBlock: {
+    marginTop: 12,
+    gap: 5,
+  },
+  deviceInfoText: {
+    fontSize: 13,
+    color: '#d1d5db',
   },
   title: {
     fontSize: 22,
@@ -225,63 +308,28 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     textAlign: 'center',
   },
-  // Novos estilos para dispositivos
-  devicesSection: {
-    width: '100%',
-    marginTop: 10,
+  cardPanicActive: {
+    borderWidth: 2,
+    borderColor: '#ef4444',
+    backgroundColor: '#331111',
   },
-  sectionTitle: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: '#f9fafb',
-    marginBottom: 15,
-    textAlign: 'center',
+  // <<-- NOVO ESTILO PARA QUEDA -->>
+  cardFallActive: {
+    borderWidth: 2,
+    borderColor: '#f59e0b', // Laranja
+    backgroundColor: '#3b2f0a',
   },
-  deviceCard: {
-    backgroundColor: '#1f2937',
-    borderRadius: 12,
-    padding: 20,
-    marginBottom: 15,
-    borderWidth: 1,
-    borderColor: '#374151',
-  },
-  deviceHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 10,
-  },
-  deviceTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#f9fafb',
-    flex: 1,
-  },
-  deviceStatus: {
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 20,
-    marginLeft: 10,
-  },
-  deviceStatusText: {
-    color: '#ffffff',
+  ackHint: {
+    marginTop: 8,
     fontSize: 12,
     fontWeight: 'bold',
-  },
-  deviceInfo: {
-    marginTop: 10,
-  },
-  deviceInfoText: {
-    fontSize: 14,
-    color: '#d1d5db',
-    marginBottom: 5,
   },
   logsButton: {
     backgroundColor: '#3b82f6',
     paddingVertical: 15,
     paddingHorizontal: 30,
     borderRadius: 10,
-    marginTop: 20,
+    marginTop: 10,
   },
   logsButtonText: {
     color: '#ffffff',
@@ -289,44 +337,5 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     textAlign: 'center',
   },
-  modalContainer: {
-    flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.8)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 20,
-  },
-  modalView: {
-    backgroundColor: '#1f2937',
-    borderRadius: 15,
-    padding: 30,
-    width: '100%',
-    maxWidth: 400,
-    alignItems: 'center',
-  },
-  modalTitle: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: '#ef4444',
-    marginBottom: 15,
-    textAlign: 'center',
-  },
-  modalText: {
-    fontSize: 16,
-    color: '#f9fafb',
-    marginBottom: 25,
-    textAlign: 'center',
-    lineHeight: 24,
-  },
-  modalButton: {
-    backgroundColor: '#ef4444',
-    paddingVertical: 15,
-    paddingHorizontal: 30,
-    borderRadius: 10,
-  },
-  modalButtonText: {
-    color: '#ffffff',
-    fontSize: 16,
-    fontWeight: 'bold',
-  },
 });
+
