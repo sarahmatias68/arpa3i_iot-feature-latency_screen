@@ -65,14 +65,14 @@ interface AlertsContextType {
   dismissActiveAlert: () => void;
   devicesById: Record<string, DeviceStatus>;
   deviceTypes: DeviceTypeConfig[];
-  updateDeviceType: (deviceId: string, newType: DeviceType) => Promise<void>;
+  updateDeviceType: (deviceId: string, newType: DeviceType | undefined) => Promise<void>;
   getDevicesByType: (type: DeviceType) => DeviceStatus[];
   getNewDevices: () => DeviceStatus[];
   acknowledgeAlert: (deviceId: string, alertType: "PANICO" | "QUEDA") => void;
   wristbandPanicActive: boolean;
 }
 
-const WEBSOCKET_URL = "ws://192.168.2.115:86/ws";
+const WEBSOCKET_URL = "ws://192.168.1.3:86/ws";
 const DEVICE_TIMEOUT_MS = 11 * 60 * 1000; // 11 minutos
 
 const AlertsContext = createContext<AlertsContextType | undefined>(undefined);
@@ -362,7 +362,7 @@ export const AlertsProvider: React.FC<AlertsProviderProps> = ({
     dismissActiveAlert();
   };
 
-  const updateDeviceType = async (deviceId: string, newType: DeviceType) => {
+  const updateDeviceType = async (deviceId: string, newType: DeviceType | undefined) => {
     try {
       setDevicesById(prev => ({
         ...prev,
@@ -372,7 +372,11 @@ export const AlertsProvider: React.FC<AlertsProviderProps> = ({
           deviceType: newType,
         }
       }));
-      await AsyncStorage.setItem(`deviceType_${deviceId}`, newType);
+      if (newType === undefined) {
+        await AsyncStorage.removeItem(`deviceType_${deviceId}`);
+      } else {
+        await AsyncStorage.setItem(`deviceType_${deviceId}`, newType);
+      }
     } catch (error) {
       console.error("Erro ao atualizar tipo do dispositivo:", error);
     }
@@ -383,7 +387,7 @@ export const AlertsProvider: React.FC<AlertsProviderProps> = ({
   };
 
   const getNewDevices = (): DeviceStatus[] => {
-    return Object.values(devicesById).filter(device => !device.deviceType);
+    return Object.values(devicesById).filter(device => !device.deviceType && device.connected);
   };
 
   const value: AlertsContextType = {

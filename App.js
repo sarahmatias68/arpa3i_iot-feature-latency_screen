@@ -16,7 +16,6 @@ import SettingsScreen from "./SettingsScreen";
 import UserDataScreen from "./UserDataScreen";
 import ElderlyDataScreen from "./ElderlyDataScreen";
 import UserListScreen from "./UserListScreen";
-import PermissionsScreen from "./PermissionsScreen";
 import AboutScreen from "./AboutScreen";
 
 const Stack = createStackNavigator();
@@ -79,7 +78,7 @@ export default function App() {
                 component={LogsScreen}
                 options={{ headerShown: true, title: "Histórico de Registros" }}
               />
-              <Stack.Screen name="Settings" options={{ headerShown: true }}>
+              <Stack.Screen name="Settings" options={{ title: "Configurações", headerShown: true }}>
                 {(props) => (
                   <SettingsScreen {...props} onLogout={handleLogout} />
                 )}
@@ -99,11 +98,6 @@ export default function App() {
                 name="UserList"
                 component={UserListScreen}
                 options={{ headerShown: true, title: "Gerenciar Usuários" }}
-              />
-              <Stack.Screen
-                name="Permissions"
-                component={PermissionsScreen}
-                options={{ headerShown: true, title: "Permissões" }}
               />
               <Stack.Screen
                 name="About"

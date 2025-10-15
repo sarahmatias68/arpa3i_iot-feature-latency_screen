@@ -12,11 +12,12 @@ export default function MainScreen({ navigation, user }) {
     updateDeviceType,
     getDevicesByType,
     getNewDevices,
-    acknowledgeAlert, // <<-- Usando a nova função unificada
+    acknowledgeAlert,
   } = useAlerts();
 
   const [typeSelectorVisible, setTypeSelectorVisible] = useState(false);
   const [selectedDeviceId, setSelectedDeviceId] = useState(null);
+  const [expandedCategory, setExpandedCategory] = useState(null);
 
   const getColorForSensorState = (state) => {
     switch (state) {
@@ -35,15 +36,22 @@ export default function MainScreen({ navigation, user }) {
   };
 
   const pulseiraDevices = getDevicesByType('pulseira');
-  const barreiraDevices = getDevicesByType('barreira');
-  const detectorDevices = getDevicesByType('detector');
-  const microondasDevices = getDevicesByType('microondas');
-  const outrosDevices = getDevicesByType('outros');
+  const detectorDevices = [...getDevicesByType('barreira'), ...getDevicesByType('microondas'), ...getDevicesByType('detector')];
+  const sensorDevices = getDevicesByType('outros');
   const newDevices = getNewDevices();
+
+  const handleRemoveType = async (deviceId) => {
+    await updateDeviceType(deviceId, undefined);
+  };
+
+  const getAlertCount = (devices) => {
+    return devices.filter(device => device.lastAlertType).length;
+  };
 
   const renderDeviceCard = (device) => {
     const deviceType = deviceTypes.find(t => t.id === device.deviceType);
     const typeConfig = deviceType || { name: "Sem tipo", color: "#6b7280", icon: "❓" };
+    const hasType = !!device.deviceType;
 
     const statusText = device.connected ? 'Online' : 'Offline';
     const statusColor = device.connected ? '#22c55e' : '#6b7280';
@@ -73,12 +81,22 @@ export default function MainScreen({ navigation, user }) {
       >
         <View style={styles.deviceHeader}>
           <Text style={styles.subTitle} numberOfLines={1} ellipsizeMode="tail">{device.deviceId}</Text>
-          <TouchableOpacity 
-            style={[styles.typeButton, { backgroundColor: typeConfig.color }]}
-            onPress={() => showTypeSelector(device.deviceId)}
-          >
-            <Text style={styles.typeButtonText}>{typeConfig.icon} {typeConfig.name}</Text>
-          </TouchableOpacity>
+          <View style={styles.typeButtonsContainer}>
+            <TouchableOpacity 
+              style={[styles.typeButton, { backgroundColor: typeConfig.color }]}
+              onPress={() => showTypeSelector(device.deviceId)}
+            >
+              <Text style={styles.typeButtonText}>{typeConfig.icon} {typeConfig.name}</Text>
+            </TouchableOpacity>
+            {hasType && (
+              <TouchableOpacity 
+                style={styles.removeButton}
+                onPress={() => handleRemoveType(device.deviceId)}
+              >
+                <Text style={styles.removeButtonText}>✕</Text>
+              </TouchableOpacity>
+            )}
+          </View>
         </View>
         <Text style={[styles.subStatus, { color: alertStatusColor }]}>
           {alertStatusText}
@@ -132,7 +150,47 @@ export default function MainScreen({ navigation, user }) {
   const renderDeviceGroup = (devices) => {
     if (devices.length === 0) return null;
     return devices.map(device => renderDeviceCard(device));
-  }
+  };
+
+  const renderCategoryButton = (title, icon, devices, categoryKey, statusText = null) => {
+    const alertCount = getAlertCount(devices);
+    const isExpanded = expandedCategory === categoryKey;
+    const hasDevices = devices.length > 0;
+
+    return (
+      <View style={styles.categoryContainer}>
+        <TouchableOpacity 
+          style={styles.categoryButton}
+          onPress={() => setExpandedCategory(isExpanded ? null : categoryKey)}
+          activeOpacity={0.7}
+        >
+          <View style={styles.categoryContent}>
+            <Text style={styles.categoryIcon}>{icon}</Text>
+            <Text style={styles.categoryTitle}>{title}</Text>
+            {statusText && (
+              <Text style={[styles.categoryStatus, { color: getColorForSensorState(statusText) }]}>
+                {statusText || 'Indisponível'}
+              </Text>
+            )}
+            {hasDevices && (
+              <Text style={styles.categoryCount}>({devices.length})</Text>
+            )}
+          </View>
+          {alertCount > 0 && (
+            <View style={styles.alertBadge}>
+              <Text style={styles.alertBadgeText}>{alertCount}</Text>
+            </View>
+          )}
+        </TouchableOpacity>
+        
+        {isExpanded && hasDevices && (
+          <View style={styles.devicesContainer}>
+            {renderDeviceGroup(devices)}
+          </View>
+        )}
+      </View>
+    );
+  };
   
   return (
     <View style={styles.container}>
@@ -144,61 +202,19 @@ export default function MainScreen({ navigation, user }) {
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
       >
-        <View style={styles.card}>
-          <Text style={styles.title}>Status do Ambiente</Text>
-          <Text style={[styles.status, { color: getColorForSensorState(sensorState) }]}>
-            {sensorState || 'Indisponível'}
-          </Text>
-        </View>
-
         {newDevices.length > 0 && (
-          <View style={styles.cardSection}>
-            <Text style={styles.sectionHeader}>🔧 Dispositivos Novos</Text>
-            <Text style={styles.sectionSubtitle}>
+          <View style={styles.newDevicesSection}>
+            <Text style={styles.newDevicesHeader}>🔧 Dispositivos Novos</Text>
+            <Text style={styles.newDevicesSubtitle}>
               Estes dispositivos precisam ter o tipo definido
             </Text>
             {renderDeviceGroup(newDevices)}
           </View>
         )}
-        
-        {pulseiraDevices.length > 0 && (
-          <View style={styles.cardSection}>
-            <Text style={styles.sectionHeader}>Pulseiras Assistivas</Text>
-            {renderDeviceGroup(pulseiraDevices)}
-          </View>
-        )}
 
-        {detectorDevices.length > 0 && (
-          <View style={styles.cardSection}>
-            <Text style={styles.sectionHeader}>Detectores de Queda</Text>
-            {renderDeviceGroup(detectorDevices)}
-          </View>
-        )}
-
-        {barreiraDevices.length > 0 && (
-          <View style={styles.cardSection}>
-            <Text style={styles.sectionHeader}>Barreiras</Text>
-            {renderDeviceGroup(barreiraDevices)}
-          </View>
-        )}
-        
-        {microondasDevices.length > 0 && (
-          <View style={styles.cardSection}>
-            <Text style={styles.sectionHeader}>Micro-ondas</Text>
-            {renderDeviceGroup(microondasDevices)}
-          </View>
-        )}
-
-        {outrosDevices.length > 0 && (
-          <View style={styles.cardSection}>
-            <Text style={styles.sectionHeader}>Outros Dispositivos</Text>
-            {renderDeviceGroup(outrosDevices)}
-          </View>
-        )}
-
-        <TouchableOpacity style={styles.logsButton} onPress={() => navigation.navigate('History', { user: user })}>
-          <Text style={styles.logsButtonText}>Histórico de Registros</Text>
-        </TouchableOpacity>
+        {renderCategoryButton('Sensores de Gás e Fumaça', '🛡️', sensorDevices, 'sensores', sensorState)}
+        {renderCategoryButton('Pulseiras Assistivas', '⌚', pulseiraDevices, 'pulseira')}
+        {renderCategoryButton('Detectores de Queda', '📱', detectorDevices, 'detector')}
 
       </ScrollView>
 
@@ -216,7 +232,7 @@ export default function MainScreen({ navigation, user }) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#111827',
+    backgroundColor: '#7a8a99',
   },
   scrollView: {
     flex: 1,
@@ -224,39 +240,103 @@ const styles = StyleSheet.create({
   scrollContent: {
     padding: 20,
     paddingBottom: 40,
-  },
-  card: {
-    backgroundColor: '#1f2937',
-    borderRadius: 12,
-    padding: 25,
-    width: '100%',
     alignItems: 'center',
-    marginBottom: 20,
   },
-  cardSection: {
+  newDevicesSection: {
     backgroundColor: '#1f2937',
     borderRadius: 12,
     padding: 20,
-    width: '100%',
+    width: '90%',
+    maxWidth: 400,
     marginBottom: 20,
   },
-  sectionHeader: {
-    fontSize: 20,
+  newDevicesHeader: {
+    fontSize: 18,
     fontWeight: 'bold',
     color: '#f9fafb',
     marginBottom: 5,
   },
-  sectionSubtitle: {
-    fontSize: 14,
+  newDevicesSubtitle: {
+    fontSize: 13,
     color: '#9ca3af',
     marginBottom: 10,
     fontStyle: 'italic',
+  },
+  categoryContainer: {
+    width: '90%',
+    maxWidth: 400,
+    marginBottom: 20,
+  },
+  categoryButton: {
+    backgroundColor: '#2d3748',
+    borderRadius: 16,
+    padding: 25,
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 8,
+    position: 'relative',
+  },
+  categoryContent: {
+    alignItems: 'center',
+  },
+  categoryIcon: {
+    fontSize: 50,
+    marginBottom: 12,
+  },
+  categoryTitle: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#ffffff',
+    textAlign: 'center',
+  },
+  categoryStatus: {
+    fontSize: 14,
+    fontWeight: '600',
+    marginTop: 6,
+    textAlign: 'center',
+  },
+  categoryCount: {
+    fontSize: 14,
+    color: '#9ca3af',
+    marginTop: 4,
+  },
+  alertBadge: {
+    position: 'absolute',
+    top: 10,
+    right: 10,
+    backgroundColor: '#ef4444',
+    borderRadius: 12,
+    minWidth: 24,
+    height: 24,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 6,
+  },
+  alertBadgeText: {
+    color: '#ffffff',
+    fontSize: 12,
+    fontWeight: 'bold',
+  },
+  devicesContainer: {
+    marginTop: 15,
+    backgroundColor: '#1f2937',
+    borderRadius: 12,
+    padding: 15,
   },
   deviceHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     marginBottom: 8,
+  },
+  typeButtonsContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
   },
   typeButton: {
     paddingHorizontal: 12,
@@ -269,12 +349,26 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     textAlign: 'center',
   },
+  removeButton: {
+    backgroundColor: '#ef4444',
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  removeButtonText: {
+    color: '#ffffff',
+    fontSize: 16,
+    fontWeight: 'bold',
+    lineHeight: 18,
+  },
   subCard: {
     backgroundColor: '#111827',
     borderRadius: 10,
     padding: 16,
     marginTop: 10,
-    borderWidth: 1,
+    borderWidth: 2,
     borderColor: '#374151',
   },
   subTitle: {
@@ -297,26 +391,14 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: '#d1d5db',
   },
-  title: {
-    fontSize: 22,
-    fontWeight: 'bold',
-    color: '#f9fafb',
-    marginBottom: 15,
-  },
-  status: {
-    fontSize: 26,
-    fontWeight: 'bold',
-    textAlign: 'center',
-  },
   cardPanicActive: {
-    borderWidth: 2,
+    borderWidth: 3,
     borderColor: '#ef4444',
     backgroundColor: '#331111',
   },
-  // <<-- NOVO ESTILO PARA QUEDA -->>
   cardFallActive: {
-    borderWidth: 2,
-    borderColor: '#f59e0b', // Laranja
+    borderWidth: 3,
+    borderColor: '#f59e0b',
     backgroundColor: '#3b2f0a',
   },
   ackHint: {
@@ -324,18 +406,4 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: 'bold',
   },
-  logsButton: {
-    backgroundColor: '#3b82f6',
-    paddingVertical: 15,
-    paddingHorizontal: 30,
-    borderRadius: 10,
-    marginTop: 10,
-  },
-  logsButtonText: {
-    color: '#ffffff',
-    fontSize: 16,
-    fontWeight: 'bold',
-    textAlign: 'center',
-  },
 });
-
