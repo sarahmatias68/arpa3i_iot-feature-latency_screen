@@ -17,7 +17,6 @@ export default function MainScreen({ navigation, user }) {
 
   const [typeSelectorVisible, setTypeSelectorVisible] = useState(false);
   const [selectedDeviceId, setSelectedDeviceId] = useState(null);
-  const [expandedCategory, setExpandedCategory] = useState(null);
 
   const getColorForSensorState = (state) => {
     switch (state) {
@@ -77,23 +76,28 @@ export default function MainScreen({ navigation, user }) {
         style={[styles.subCard, alertStyle]}
         // <<-- CORREÇÃO: Chama a função unificada ao tocar no card em alerta -->>
         onPress={isAlertActive ? () => acknowledgeAlert(device.deviceId, device.lastAlertType) : undefined}
-        activeOpacity={isAlertActive ? 0.7 : 1}
       >
         <View style={styles.deviceHeader}>
           <Text style={styles.subTitle} numberOfLines={1} ellipsizeMode="tail">{device.deviceId}</Text>
           <View style={styles.typeButtonsContainer}>
             <TouchableOpacity 
-              style={[styles.typeButton, { backgroundColor: typeConfig.color }]}
-              onPress={() => showTypeSelector(device.deviceId)}
+              style={[
+                styles.typeButton, 
+                { backgroundColor: typeConfig.color },
+                isAlertActive && styles.buttonDisabled
+              ]}
+              onPress={() => !isAlertActive && showTypeSelector(device.deviceId)}
+              disabled={isAlertActive}
             >
-              <Text style={styles.typeButtonText}>{typeConfig.icon} {typeConfig.name}</Text>
+              <Text style={styles.typeButtonText}>{typeConfig.name}</Text>
             </TouchableOpacity>
             {hasType && (
               <TouchableOpacity 
-                style={styles.removeButton}
-                onPress={() => handleRemoveType(device.deviceId)}
+                style={[styles.removeButton, isAlertActive && styles.buttonDisabled]}
+                onPress={() => !isAlertActive && handleRemoveType(device.deviceId)}
+                disabled={isAlertActive}
               >
-                <Text style={styles.removeButtonText}>✕</Text>
+                <Text style={styles.removeButtonText}>Remover Tipo</Text>
               </TouchableOpacity>
             )}
           </View>
@@ -152,27 +156,24 @@ export default function MainScreen({ navigation, user }) {
     return devices.map(device => renderDeviceCard(device));
   };
 
-  const renderCategoryButton = (title, icon, devices, categoryKey, statusText = null) => {
+  const renderCategoryButton = (title, icon, devices, categoryKey) => {
     const alertCount = getAlertCount(devices);
-    const isExpanded = expandedCategory === categoryKey;
-    const hasDevices = devices.length > 0;
 
     return (
       <View style={styles.categoryContainer}>
         <TouchableOpacity 
           style={styles.categoryButton}
-          onPress={() => setExpandedCategory(isExpanded ? null : categoryKey)}
+          onPress={() => navigation.navigate('CategoryDevices', {
+            categoryTitle: title,
+            categoryIcon: icon,
+            categoryKey: categoryKey,
+          })}
           activeOpacity={0.7}
         >
           <View style={styles.categoryContent}>
             <Text style={styles.categoryIcon}>{icon}</Text>
             <Text style={styles.categoryTitle}>{title}</Text>
-            {statusText && (
-              <Text style={[styles.categoryStatus, { color: getColorForSensorState(statusText) }]}>
-                {statusText || 'Indisponível'}
-              </Text>
-            )}
-            {hasDevices && (
+            {devices.length > 0 && (
               <Text style={styles.categoryCount}>({devices.length})</Text>
             )}
           </View>
@@ -182,12 +183,6 @@ export default function MainScreen({ navigation, user }) {
             </View>
           )}
         </TouchableOpacity>
-        
-        {isExpanded && hasDevices && (
-          <View style={styles.devicesContainer}>
-            {renderDeviceGroup(devices)}
-          </View>
-        )}
       </View>
     );
   };
@@ -212,7 +207,7 @@ export default function MainScreen({ navigation, user }) {
           </View>
         )}
 
-        {renderCategoryButton('Sensores de Gás e Fumaça', '🛡️', sensorDevices, 'sensores', sensorState)}
+        {renderCategoryButton('Sensores de Gás e Fumaça', '🛡️', sensorDevices, 'sensores')}
         {renderCategoryButton('Pulseiras Assistivas', '⌚', pulseiraDevices, 'pulseira')}
         {renderCategoryButton('Detectores de Queda', '📱', detectorDevices, 'detector')}
 
@@ -293,12 +288,6 @@ const styles = StyleSheet.create({
     color: '#ffffff',
     textAlign: 'center',
   },
-  categoryStatus: {
-    fontSize: 14,
-    fontWeight: '600',
-    marginTop: 6,
-    textAlign: 'center',
-  },
   categoryCount: {
     fontSize: 14,
     color: '#9ca3af',
@@ -351,17 +340,17 @@ const styles = StyleSheet.create({
   },
   removeButton: {
     backgroundColor: '#ef4444',
-    width: 28,
-    height: 28,
-    borderRadius: 14,
-    justifyContent: 'center',
-    alignItems: 'center',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 8,
   },
   removeButtonText: {
     color: '#ffffff',
-    fontSize: 16,
+    fontSize: 12,
     fontWeight: 'bold',
-    lineHeight: 18,
+  },
+  buttonDisabled: {
+    opacity: 0.5,
   },
   subCard: {
     backgroundColor: '#111827',

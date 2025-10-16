@@ -17,13 +17,12 @@ const DeviceTypeSelector = ({
 }) => {
   const renderTypeItem = ({ item }) => (
     <TouchableOpacity
-      style={[styles.typeItem, { backgroundColor: item.color }]}
+      style={styles.typeItem}
       onPress={() => {
         onSelectType(item.id);
         onClose();
       }}
     >
-      <Text style={styles.typeIcon}>{item.icon}</Text>
       <Text style={styles.typeName}>{item.name}</Text>
     </TouchableOpacity>
   );
@@ -38,17 +37,16 @@ const DeviceTypeSelector = ({
       <View style={styles.modalOverlay}>
         <View style={styles.modalContent}>
           <Text style={styles.modalTitle}>
-            Selecionar Tipo para {deviceId}
+            Selecionar Tipo
           </Text>
           <Text style={styles.modalSubtitle}>
-            Escolha a categoria que melhor descreve este dispositivo
+            {deviceId}
           </Text>
           
           <FlatList
             data={deviceTypes}
             renderItem={renderTypeItem}
             keyExtractor={(item) => item.id}
-            numColumns={2}
             contentContainerStyle={styles.typeList}
           />
           
@@ -89,28 +87,24 @@ const styles = StyleSheet.create({
     color: '#9ca3af',
     textAlign: 'center',
     marginBottom: 20,
+    fontStyle: 'italic',
   },
   typeList: {
     paddingVertical: 10,
   },
   typeItem: {
-    flex: 1,
-    margin: 8,
-    padding: 20,
-    borderRadius: 12,
+    backgroundColor: '#374151',
+    padding: 18,
+    borderRadius: 10,
+    marginVertical: 6,
     alignItems: 'center',
-    justifyContent: 'center',
-    minHeight: 100,
-  },
-  typeIcon: {
-    fontSize: 32,
-    marginBottom: 8,
+    borderWidth: 1,
+    borderColor: '#4b5563',
   },
   typeName: {
-    color: '#ffffff',
-    fontSize: 14,
-    fontWeight: 'bold',
-    textAlign: 'center',
+    color: '#f9fafb',
+    fontSize: 16,
+    fontWeight: '600',
   },
   cancelButton: {
     backgroundColor: '#6b7280',

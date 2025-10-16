@@ -29,7 +29,8 @@ const SettingsScreen = ({ navigation, onLogout }) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#111827',
+    backgroundColor: '#7a8a99',
+    
   },
   menuItem: {
     flexDirection: 'row',

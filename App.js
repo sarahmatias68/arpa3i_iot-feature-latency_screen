@@ -11,6 +11,7 @@ import LoginScreen from "./LoginScreen";
 import SignUpScreen from "./SignUpScreen";
 import ForgotPasswordScreen from "./ForgotPasswordScreen";
 import MainScreen from "./MainScreen";
+import CategoryDevicesScreen from "./CategoryDevicesScreen";
 import LogsScreen from "./LogsScreen";
 import SettingsScreen from "./SettingsScreen";
 import UserDataScreen from "./UserDataScreen";
@@ -54,7 +55,7 @@ export default function App() {
                 options={({ navigation }) => ({
                   headerShown: true,
                   title: "Painel de Controle",
-                  headerStyle: { backgroundColor: "#1f2937" },
+                  headerStyle: { backgroundColor: "#1f2937"},
                   headerTintColor: "#f9fafb",
                   headerTitleStyle: { fontWeight: "bold" },
                   headerRight: () => (
@@ -74,11 +75,19 @@ export default function App() {
                 {(props) => <MainScreen {...props} user={user} />}
               </Stack.Screen>
               <Stack.Screen
+                name="CategoryDevices"
+                component={CategoryDevicesScreen}
+                options={({ route }) => ({
+                  headerShown: true,
+                  title: route.params?.categoryTitle || "Dispositivos"
+                })}
+              />
+              <Stack.Screen
                 name="History"
                 component={LogsScreen}
                 options={{ headerShown: true, title: "Histórico de Registros" }}
               />
-              <Stack.Screen name="Settings" options={{ title: "Configurações", headerShown: true }}>
+              <Stack.Screen name="Settings" options={{ title: "Configurações", headerShown: true, headerStyle: { backgroundColor: "#1f2937" }, headerTintColor: "#f9fafb", headerTitleStyle: { fontWeight: "bold" } }}>
                 {(props) => (
                   <SettingsScreen {...props} onLogout={handleLogout} />
                 )}

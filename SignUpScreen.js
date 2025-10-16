@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { View, Text, TextInput, TouchableOpacity, StyleSheet, Alert, ActivityIndicator, KeyboardAvoidingView, TouchableWithoutFeedback, Keyboard, Platform } from 'react-native';
 
-const API_URL = 'http://192.168.1.3:86'; 
+const API_URL = 'http://192.168.1.4:86'; 
 
 const SignUpScreen = ({ navigation }) => {
   const [name, setName] = useState('');
@@ -84,7 +84,7 @@ const SignUpScreen = ({ navigation }) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#111827',
+    backgroundColor: '#7a8a99',
   },
   inner: {
     flex: 1,

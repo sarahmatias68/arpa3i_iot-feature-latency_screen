@@ -34,7 +34,7 @@ interface DeviceStatus {
   deviceType?: string;
 }
 
-type DeviceType = "pulseira" | "barreira" | "microondas" | "detector" | "outros";
+type DeviceType = "pulseira" | "barreira" | "microondas" | "detector" | "gas_fumaca";
 
 interface DeviceTypeConfig {
   id: DeviceType;
@@ -72,7 +72,7 @@ interface AlertsContextType {
   wristbandPanicActive: boolean;
 }
 
-const WEBSOCKET_URL = "ws://192.168.1.3:86/ws";
+const WEBSOCKET_URL = "ws://192.168.1.4:86/ws";
 const DEVICE_TIMEOUT_MS = 11 * 60 * 1000; // 11 minutos
 
 const AlertsContext = createContext<AlertsContextType | undefined>(undefined);
@@ -107,7 +107,7 @@ export const AlertsProvider: React.FC<AlertsProviderProps> = ({
     { id: "barreira", name: "Barreira", color: "#10b981", icon: "🚧" },
     { id: "detector", name: "Detector de Queda", color: "#ef4444", icon: "📱" },
     { id: "microondas", name: "Micro-ondas", color: "#f59e0b", icon: "📡" },
-    { id: "outros", name: "Outros", color: "#6b7280", icon: "🔧" },
+    { id: "gas_fumaca", name: "Gás e Fumaça", color: "#6b7280", icon: "🔥" },
   ];
 
   const markAllDevicesAsOffline = useCallback(() => {
@@ -126,6 +126,17 @@ export const AlertsProvider: React.FC<AlertsProviderProps> = ({
     const handlers = {
       onOpen: () => {
         setConnectionStatus("Conectado");
+        // Inicializa o dispositivo virtual do sensor de gás e fumaça
+        setDevicesById(prev => ({
+          ...prev,
+          "SENSOR_GAS_FUMACA": {
+            deviceId: "SENSOR_GAS_FUMACA",
+            status: "online",
+            connected: true,
+            lastSeen: Date.now(),
+            deviceType: "gas_fumaca",
+          }
+        }));
       },
 
       onMessage: (event: { data: string }) => {
@@ -135,7 +146,18 @@ export const AlertsProvider: React.FC<AlertsProviderProps> = ({
           if (data.type === "ping") return;
           if (data.type === "sensor") {
             setSensorState(data.tipo);
-            return; // Finaliza o processamento para esta mensagem
+            // Atualiza o dispositivo virtual do sensor de gás e fumaça
+            setDevicesById(prev => ({
+              ...prev,
+              "SENSOR_GAS_FUMACA": {
+                deviceId: "SENSOR_GAS_FUMACA",
+                status: "online",
+                connected: true,
+                lastSeen: Date.now(),
+                deviceType: "gas_fumaca",
+              }
+            }));
+            return;
           }
 
           // <<-- CORREÇÃO: Lógica unificada para extrair deviceId -->>
@@ -157,6 +179,12 @@ export const AlertsProvider: React.FC<AlertsProviderProps> = ({
                         lastSeen: Date.now(),
                     }
                 }));
+                // Persiste o alerta
+                AsyncStorage.setItem(`deviceAlert_${deviceId}`, JSON.stringify({
+                  alertType: "PANICO",
+                  timestamp: Date.now()
+                })).catch(e => console.error("Erro ao salvar alerta:", e));
+                
                 setActiveAlert({
                     title: "🚨 ALERTA DE PÂNICO!",
                     message: `Botão de pânico acionado pelo dispositivo '${deviceId}'.`,
@@ -177,6 +205,12 @@ export const AlertsProvider: React.FC<AlertsProviderProps> = ({
                         lastSeen: Date.now(),
                     }
                 }));
+                // Persiste o alerta
+                AsyncStorage.setItem(`deviceAlert_${deviceId}`, JSON.stringify({
+                  alertType: "QUEDA",
+                  timestamp: Date.now()
+                })).catch(e => console.error("Erro ao salvar alerta:", e));
+                
                 const fallDetails: FallDetails = {
                     status: "Queda Detectada",
                     comodo: local,
@@ -290,12 +324,27 @@ export const AlertsProvider: React.FC<AlertsProviderProps> = ({
 
         for (const deviceId of knownIds) {
           const persistedType = await AsyncStorage.getItem(`deviceType_${deviceId}`);
+          const persistedAlertJson = await AsyncStorage.getItem(`deviceAlert_${deviceId}`);
+          
+          let lastAlertType = undefined;
+          if (persistedAlertJson) {
+            const alertData = JSON.parse(persistedAlertJson);
+            // Verifica se o alerta ainda é válido (menos de 24 horas)
+            if (Date.now() - alertData.timestamp < 24 * 60 * 60 * 1000) {
+              lastAlertType = alertData.alertType;
+            } else {
+              // Remove alertas expirados
+              await AsyncStorage.removeItem(`deviceAlert_${deviceId}`);
+            }
+          }
+          
           initialDevicesState[deviceId] = {
             deviceId,
             status: 'offline',
             connected: false,
             lastSeen: 0,
             deviceType: persistedType as DeviceType || undefined,
+            lastAlertType: lastAlertType,
           };
         }
         setDevicesById(initialDevicesState);
@@ -347,6 +396,10 @@ export const AlertsProvider: React.FC<AlertsProviderProps> = ({
         });
         ws.current.ws.send(message);
     }
+    
+    // Remove o alerta persistido
+    AsyncStorage.removeItem(`deviceAlert_${deviceId}`)
+      .catch(e => console.error("Erro ao remover alerta:", e));
     
     // Limpa o estado local
     if (alertType === 'PANICO') setWristbandPanicActive(false);
