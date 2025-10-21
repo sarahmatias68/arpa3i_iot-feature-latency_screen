@@ -94,24 +94,24 @@ export default function App() {
               </Stack.Screen>
               <Stack.Screen
                 name="UserData"
-                options={{ headerShown: true, title: "Meus Dados" }}
+                options={{ headerShown: true, title: "Meus Dados", headerStyle: { backgroundColor: "#1f2937" }, headerTintColor: "#f9fafb", headerTitleStyle: { fontWeight: "bold" } }}
               >
                 {(props) => <UserDataScreen {...props} user={user} />}
               </Stack.Screen>
               <Stack.Screen
                 name="ElderlyData"
                 component={ElderlyDataScreen}
-                options={{ headerShown: true, title: "Dados do Idoso" }}
+                options={{ headerShown: true, title: "Dados do Idoso", headerStyle: { backgroundColor: "#1f2937" }, headerTintColor: "#f9fafb", headerTitleStyle: { fontWeight: "bold" } }}
               />
               <Stack.Screen
                 name="UserList"
                 component={UserListScreen}
-                options={{ headerShown: true, title: "Gerenciar Usuários" }}
+                options={{ headerShown: true, title: "Gerenciar Usuários", headerStyle: { backgroundColor: "#1f2937" }, headerTintColor: "#f9fafb", headerTitleStyle: { fontWeight: "bold" } }}
               />
               <Stack.Screen
                 name="About"
                 component={AboutScreen}
-                options={{ headerShown: true, title: "Sobre o Aplicativo" }}
+                options={{ headerShown: true, title: "Sobre o Aplicativo", headerStyle: { backgroundColor: "#1f2937" }, headerTintColor: "#f9fafb", headerTitleStyle: { fontWeight: "bold" } }}
               />
             </>
           ) : (

@@ -143,7 +143,7 @@ export default function CategoryDevicesScreen({ route, navigation }) {
             )}
             {typeof device.uptimeSec === 'number' && (
               <Text style={styles.deviceInfoText}>
-                Uptime: {Math.floor(device.uptimeSec/3600)}h {Math.floor((device.uptimeSec%3600)/60)}m
+                Tempo ligado: {Math.floor(device.uptimeSec/3600)}h {Math.floor((device.uptimeSec%3600)/60)}m
               </Text>
             )}
             {typeof device.rssiDbm === 'number' && (
@@ -205,7 +205,7 @@ export default function CategoryDevicesScreen({ route, navigation }) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#111827',
+    backgroundColor: '#7a8a99',
   },
   scrollView: {
     flex: 1,
@@ -233,7 +233,7 @@ const styles = StyleSheet.create({
   },
   deviceCount: {
     fontSize: 14,
-    color: '#9ca3af',
+    color: '#f3f4f6',
   },
   deviceCard: {
     backgroundColor: '#1f2937',

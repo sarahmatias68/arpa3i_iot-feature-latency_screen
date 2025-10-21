@@ -114,7 +114,7 @@ export default function MainScreen({ navigation, user }) {
             )}
             {typeof device.uptimeSec === 'number' && (
               <Text style={styles.deviceInfoText}>
-                Uptime: {Math.floor(device.uptimeSec/3600)}h {Math.floor((device.uptimeSec%3600)/60)}m
+                Tempo ligado: {Math.floor(device.uptimeSec/3600)}h {Math.floor((device.uptimeSec%3600)/60)}m
               </Text>
             )}
             {typeof device.rssiDbm === 'number' && (
@@ -318,6 +318,7 @@ const styles = StyleSheet.create({
   },
   deviceHeader: {
     flexDirection: 'row',
+    backgroundColor: '#0e76a8',
     justifyContent: 'space-between',
     alignItems: 'center',
     marginBottom: 8,

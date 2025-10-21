@@ -60,10 +60,10 @@ const styles = StyleSheet.create({
     gap: 30,
     marginTop: 10,
   },
-  container: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#111827', padding: 20 },
+  container: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#4e5861', padding: 20 },
   title: { color: '#f9fafb', fontSize: 22, fontWeight: 'bold', textAlign: 'center', marginTop: 20, marginBottom: 10 },
   text: { color: '#d1d5db', fontSize: 16, textAlign: 'center', marginBottom: 15 },
-  footer: { position: 'absolute', bottom: 30, color: '#6b7280', fontSize: 12 },
+  footer: { position: 'absolute', bottom: 30, color: '#f3f4f6', fontSize: 12 },
 });
 
 export default AboutScreen;
