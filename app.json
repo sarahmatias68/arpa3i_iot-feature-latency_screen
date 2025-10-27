@@ -21,15 +21,22 @@
         "backgroundColor": "#ffffff"
       },
       "edgeToEdgeEnabled": true,
-      "package": "com.sarah.santos.arpa3i_iot"
+      "package": "com.sarah.santos.arpa3i_iot",
+      "googleServicesFile": "./google-services.json"
     },
     "web": {
       "favicon": "./assets/favicon.png"
     },
+    "plugins": [
+      "expo-notifications",
+      "@react-native-firebase/app",
+      "@react-native-firebase/messaging"
+    ],
     "extra": {
       "eas": {
         "projectId": "82cc69e1-cc3b-4046-a4b3-72741c45bb2f"
-      }
+      },
+      "apiUrl": "https://vercel-arpa3i.vercel.app"
     }
   }
 }

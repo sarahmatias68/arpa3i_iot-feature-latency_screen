@@ -1,10 +1,11 @@
 import { useState, useEffect, useRef } from "react";
-import { TouchableOpacity, Platform } from "react-native";
+import { TouchableOpacity } from "react-native";
 import { NavigationContainer } from "@react-navigation/native";
-import * as Notifications from "expo-notifications";
+
 import { createStackNavigator } from "@react-navigation/stack";
 import { Ionicons } from "@expo/vector-icons";
 import { AlertsProvider } from "./AlertsContext";
+import { registerForFcmAndSendToBackend, setupNotificationHandlers } from "./notificationService";
 
 // Telas
 import LoginScreen from "./LoginScreen";
@@ -26,14 +27,21 @@ export default function App() {
   const [user, setUser] = useState(null); // Estado para controlar o usuário logado
 
   useEffect(() => {
-    registerForPushNotificationsAsync().then((token) => {
+    let unsubscribe = () => {};
+    (async () => {
+      const token = await registerForFcmAndSendToBackend(user?.id);
       if (token) {
         setExpoPushToken(token);
-        console.log("Expo Push Token:", token);
-        // Aqui você enviaria o token para o seu servidor
+        console.log("FCM token:", token);
       }
+    })();
+    unsubscribe = setupNotificationHandlers((notification) => {
+      console.log("Notificação recebida:", notification?.request?.content);
     });
-  }, []);
+    return () => {
+      unsubscribe && unsubscribe();
+    };
+  }, [user]);
 
   const handleLoginSuccess = (userData) => {
     setUser(userData);
@@ -133,30 +141,4 @@ export default function App() {
       </AlertsProvider>
     </NavigationContainer>
   );
-}
-
-async function registerForPushNotificationsAsync() {
-  let token;
-  if (Platform.OS === "android") {
-    await Notifications.setNotificationChannelAsync("default", {
-      name: "default",
-      importance: Notifications.AndroidImportance.MAX,
-      vibrationPattern: [0, 250, 250, 250],
-      lightColor: "#FF231F7C",
-    });
-  }
-
-  const { status: existingStatus } = await Notifications.getPermissionsAsync();
-  let finalStatus = existingStatus;
-  if (existingStatus !== "granted") {
-    const { status } = await Notifications.requestPermissionsAsync();
-    finalStatus = status;
-  }
-  if (finalStatus !== "granted") {
-    alert("Failed to get push token for push notification!");
-    return;
-  }
-  token = (await Notifications.getExpoPushTokenAsync()).data;
-
-  return token;
 }
