@@ -1,13 +1,13 @@
 {
   "project_info": {
-    "project_number": "726250322847",
-    "project_id": "arpa3i",
-    "storage_bucket": "arpa3i.firebasestorage.app"
+    "project_number": "386963364135",
+    "project_id": "arpa3iv1",
+    "storage_bucket": "arpa3iv1.firebasestorage.app"
   },
   "client": [
     {
       "client_info": {
-        "mobilesdk_app_id": "1:726250322847:android:ec5766f7804dfad1051baa",
+        "mobilesdk_app_id": "1:386963364135:android:536a541dba0f07fb493102",
         "android_client_info": {
           "package_name": "com.sarah.santos.arpa3i_iot"
         }
@@ -15,7 +15,7 @@
       "oauth_client": [],
       "api_key": [
         {
-          "current_key": "AIzaSyBT7_6FRsWudKzMxcmNH4VeUz8J8PjyYvE"
+          "current_key": "AIzaSyCYcIpBHAjcfXBimUdUiKF0hF-ssVpI510"
         }
       ],
       "services": {

@@ -1,11 +1,26 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect } from "react";
 import { TouchableOpacity } from "react-native";
-import { NavigationContainer } from "@react-navigation/native";
+// IMPORTAÇÃO MODIFICADA
+import {
+  NavigationContainer,
+  useNavigationContainerRef,
+} from "@react-navigation/native";
 
 import { createStackNavigator } from "@react-navigation/stack";
 import { Ionicons } from "@expo/vector-icons";
 import { AlertsProvider } from "./AlertsContext";
-import { registerForFcmAndSendToBackend, setupNotificationHandlers } from "./notificationService";
+// IMPORTAÇÃO MODIFICADA
+import { registerForFcmAndSendToBackend } from "./notificationService";
+
+// --- IMPORTAÇÕES ADICIONADAS E MODIFICADAS (API MODULAR) ---
+import {
+  getMessaging,
+  onMessage,
+  onNotificationOpenedApp,
+  getInitialNotification,
+} from "@react-native-firebase/messaging";
+import * as Notifications from "expo-notifications";
+// --- FIM DAS IMPORTAÇÕES ---
 
 // Telas
 import LoginScreen from "./LoginScreen";
@@ -26,22 +41,84 @@ export default function App() {
   const [expoPushToken, setExpoPushToken] = useState("");
   const [user, setUser] = useState(null); // Estado para controlar o usuário logado
 
+  // --- ADICIONADO ---
+  // Ref para navegar ao clicar na notificação
+  const navigationRef = useNavigationContainerRef();
+
+  // --- USE EFFECT MODIFICADO ---
   useEffect(() => {
-    let unsubscribe = () => {};
-    (async () => {
-      const token = await registerForFcmAndSendToBackend(user?.id);
-      if (token) {
-        setExpoPushToken(token);
-        console.log("FCM token:", token);
-      }
-    })();
-    unsubscribe = setupNotificationHandlers((notification) => {
-      console.log("Notificação recebida:", notification?.request?.content);
+    // Se não há usuário, não faz nada (e limpa listeners antigos se houver)
+    if (!user) {
+      return;
+    }
+
+    // 1. REGISTRO DO TOKEN (LÓGICA EXISTENTE)
+    // Assegura que temos um ID de usuário antes de registrar
+    const userId = user?.id;
+    if (userId) {
+      (async () => {
+        const token = await registerForFcmAndSendToBackend(userId);
+        if (token) {
+          setExpoPushToken(token);
+          console.log("FCM token registrado:", token);
+        }
+      })();
+    }
+
+    // --- SINTAXE MODULAR ADOTADA ---
+    const messaging = getMessaging();
+
+    // 2. LISTENER DE FOREGROUND (APP ABERTO)
+    const unsubscribeOnMessage = onMessage(messaging, async (remoteMessage) => {
+      console.log("Mensagem recebida em Foreground:", remoteMessage);
+
+      // Usa o expo-notifications SÓ para exibir a notificação
+      await Notifications.scheduleNotificationAsync({
+        content: {
+          title: remoteMessage.notification?.title || "Novo Alerta",
+          body: remoteMessage.notification?.body || "",
+          data: remoteMessage.data,
+        },
+        trigger: null, // Exibe imediatamente
+      });
     });
+
+    // 3. LISTENER DE TAPS (APP EM BACKGROUND)
+    const unsubscribeOnNotificationOpened = onNotificationOpenedApp(
+      messaging,
+      (remoteMessage) => {
+        console.log(
+          "Notificação fez o app abrir (background):",
+          remoteMessage
+        );
+        // Exemplo: Navega para a tela de Histórico/Logs
+        if (navigationRef.isReady()) {
+          navigationRef.navigate("History");
+        }
+      }
+    );
+
+    // 4. CHECAGEM DE TAP (APP FECHADO)
+    getInitialNotification(messaging).then((remoteMessage) => {
+      if (remoteMessage) {
+        console.log(
+          "Notificação fez o app abrir (fechado):",
+          remoteMessage
+        );
+        // Você pode querer guardar isso em um state e navegar
+        // quando o navigationRef estiver pronto
+        if (navigationRef.isReady()) {
+          navigationRef.navigate("History");
+        }
+      }
+    });
+
+    // Função de limpeza (roda quando o 'user' muda, ex: logout)
     return () => {
-      unsubscribe && unsubscribe();
+      unsubscribeOnMessage();
+      unsubscribeOnNotificationOpened();
     };
-  }, [user]);
+  }, [user]); // Dependência [user] está correta
 
   const handleLoginSuccess = (userData) => {
     setUser(userData);
@@ -52,7 +129,8 @@ export default function App() {
   };
 
   return (
-    <NavigationContainer>
+    // REF ADICIONADA AO CONTAINER
+    <NavigationContainer ref={navigationRef}>
       <AlertsProvider user={user}>
         <Stack.Navigator screenOptions={{ headerShown: false }}>
           {user ? (
@@ -63,7 +141,7 @@ export default function App() {
                 options={({ navigation }) => ({
                   headerShown: true,
                   title: "Painel de Controle",
-                  headerStyle: { backgroundColor: "#1f2937"},
+                  headerStyle: { backgroundColor: "#1f2937" },
                   headerTintColor: "#f9fafb",
                   headerTitleStyle: { fontWeight: "bold" },
                   headerRight: () => (
@@ -87,39 +165,72 @@ export default function App() {
                 component={CategoryDevicesScreen}
                 options={({ route }) => ({
                   headerShown: true,
-                  title: route.params?.categoryTitle || "Dispositivos"
+                  title: route.params?.categoryTitle || "Dispositivos",
                 })}
               />
               <Stack.Screen
-                name="History"
+                name="History" // Este é o nome que usamos no listener
                 component={LogsScreen}
                 options={{ headerShown: true, title: "Histórico de Registros" }}
               />
-              <Stack.Screen name="Settings" options={{ title: "Configurações", headerShown: true, headerStyle: { backgroundColor: "#1f2937" }, headerTintColor: "#f9fafb", headerTitleStyle: { fontWeight: "bold" } }}>
+              <Stack.Screen
+                name="Settings"
+                options={{
+                  title: "Configurações",
+                  headerShown: true,
+                  headerStyle: { backgroundColor: "#1f2937" },
+                  headerTintColor: "#f9fafb",
+                  headerTitleStyle: { fontWeight: "bold" },
+                }}
+              >
                 {(props) => (
                   <SettingsScreen {...props} onLogout={handleLogout} />
                 )}
               </Stack.Screen>
               <Stack.Screen
                 name="UserData"
-                options={{ headerShown: true, title: "Meus Dados", headerStyle: { backgroundColor: "#1f2937" }, headerTintColor: "#f9fafb", headerTitleStyle: { fontWeight: "bold" } }}
+                options={{
+                  headerShown: true,
+                  title: "Meus Dados",
+                  headerStyle: { backgroundColor: "#1f2937" },
+                  headerTintColor: "#f9fafb",
+                  headerTitleStyle: { fontWeight: "bold" },
+                }}
               >
                 {(props) => <UserDataScreen {...props} user={user} />}
               </Stack.Screen>
               <Stack.Screen
                 name="ElderlyData"
                 component={ElderlyDataScreen}
-                options={{ headerShown: true, title: "Dados do Idoso", headerStyle: { backgroundColor: "#1f2937" }, headerTintColor: "#f9fafb", headerTitleStyle: { fontWeight: "bold" } }}
+                options={{
+                  headerShown: true,
+                  title: "Dados do Idoso",
+                  headerStyle: { backgroundColor: "#1f2937" },
+                  headerTintColor: "#f9fafb",
+                  headerTitleStyle: { fontWeight: "bold" },
+                }}
               />
               <Stack.Screen
                 name="UserList"
                 component={UserListScreen}
-                options={{ headerShown: true, title: "Gerenciar Usuários", headerStyle: { backgroundColor: "#1f2937" }, headerTintColor: "#f9fafb", headerTitleStyle: { fontWeight: "bold" } }}
+                options={{
+                  headerShown: true,
+                  title: "Gerenciar Usuários",
+                  headerStyle: { backgroundColor: "#1f2937" },
+                  headerTintColor: "#f9fafb",
+                  headerTitleStyle: { fontWeight: "bold" },
+                }}
               />
               <Stack.Screen
                 name="About"
                 component={AboutScreen}
-                options={{ headerShown: true, title: "Sobre o Aplicativo", headerStyle: { backgroundColor: "#1f2937" }, headerTintColor: "#f9fafb", headerTitleStyle: { fontWeight: "bold" } }}
+                options={{
+                  headerShown: true,
+                  title: "Sobre o Aplicativo",
+                  headerStyle: { backgroundColor: "#1f2937" },
+                  headerTintColor: "#f9fafb",
+                  headerTitleStyle: { fontWeight: "bold" },
+                }}
               />
             </>
           ) : (
@@ -142,3 +253,4 @@ export default function App() {
     </NavigationContainer>
   );
 }
+

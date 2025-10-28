@@ -1,7 +1,13 @@
 import * as Notifications from "expo-notifications";
 import Constants from "expo-constants";
 import { Platform } from "react-native";
-import messaging from "@react-native-firebase/messaging";
+import { getApp } from "@react-native-firebase/app";
+import {
+  getMessaging,
+  getToken as getFcmToken,
+  requestPermission as requestMessagingPermission,
+  AuthorizationStatus,
+} from "@react-native-firebase/messaging";
 
 Notifications.setNotificationHandler({
   handleNotification: async () => ({
@@ -20,7 +26,6 @@ function getBackendUrl() {
 }
 
 async function ensureNotificationPermissions() {
-  // Android: canal de notificação
   if (Platform.OS === "android") {
     await Notifications.setNotificationChannelAsync("default", {
       name: "default",
@@ -29,7 +34,6 @@ async function ensureNotificationPermissions() {
       lightColor: "#FF231F7C",
     });
   }
-  // Expo: solicitar permissão (Android 13+ e iOS)
   const { status: existingStatus } = await Notifications.getPermissionsAsync();
   let finalStatus = existingStatus;
   if (finalStatus !== "granted") {
@@ -39,6 +43,7 @@ async function ensureNotificationPermissions() {
   return finalStatus === "granted";
 }
 
+// ESTA FUNÇÃO ESTÁ INTACTA E CORRETA
 export async function registerForFcmAndSendToBackend(userId) {
   const granted = await ensureNotificationPermissions();
   if (!granted) {
@@ -46,26 +51,33 @@ export async function registerForFcmAndSendToBackend(userId) {
     return null;
   }
 
-  // Obter FCM token via RNFirebase Messaging
   let fcmToken = null;
   try {
-    // iOS: checar autorização do messaging
+    const app = getApp();
+    const messaging = getMessaging(app);
+
     if (Platform.OS === "ios") {
-      const authStatus = await messaging().requestPermission();
+      const authStatus = await requestMessagingPermission(messaging);
       const enabled =
-        authStatus === messaging.AuthorizationStatus.AUTHORIZED ||
-        authStatus === messaging.AuthorizationStatus.PROVISIONAL;
+        authStatus === AuthorizationStatus.AUTHORIZED ||
+        authStatus === AuthorizationStatus.PROVISIONAL;
       if (!enabled) {
         console.warn("Permissões de mensagens (FCM) não concedidas no iOS");
       }
     }
-    fcmToken = await messaging().getToken();
+
+    fcmToken = await getFcmToken(messaging);
   } catch (e) {
-    console.error("Falha ao obter FCM token via messaging:", e);
+    console.error(
+      "Falha ao obter FCM token via messaging (módulo nativo ausente ou build sem Dev Client/EAS):",
+      e
+    );
   }
 
   if (!fcmToken) {
-    console.warn("FCM token vazio. Verifique build com EAS/Dev Client e google-services.json.");
+    console.warn(
+      "FCM token vazio. Reinstale o Dev Client após configurar plugins e google-services.json, e abra com --dev-client."
+    );
     return null;
   }
 
@@ -86,19 +98,4 @@ export async function registerForFcmAndSendToBackend(userId) {
   }
 
   return fcmToken;
-}
-
-export function setupNotificationHandlers(onMessage) {
-  const foregroundSubscription = Notifications.addNotificationReceivedListener((notification) => {
-    if (onMessage) onMessage(notification);
-  });
-
-  const responseSubscription = Notifications.addNotificationResponseReceivedListener((response) => {
-    console.log("Usuário interagiu com notificação:", response);
-  });
-
-  return () => {
-    foregroundSubscription.remove();
-    responseSubscription.remove();
-  };
 }
