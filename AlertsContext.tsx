@@ -72,7 +72,7 @@ interface AlertsContextType {
   wristbandPanicActive: boolean;
 }
 
-const WEBSOCKET_URL = "ws://192.168.2.115:86/ws";
+const WEBSOCKET_URL = "ws://192.168.1.2:86/ws";
 const DEVICE_TIMEOUT_MS = 11 * 60 * 1000; // 11 minutos
 
 const AlertsContext = createContext<AlertsContextType | undefined>(undefined);

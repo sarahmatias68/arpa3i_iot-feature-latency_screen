@@ -12,6 +12,9 @@ import { AlertsProvider } from "./AlertsContext";
 // IMPORTAÇÃO MODIFICADA
 import { registerForFcmAndSendToBackend } from "./notificationService";
 
+// Persistência de autenticação
+import AsyncStorage from "@react-native-async-storage/async-storage";
+
 // --- IMPORTAÇÕES ADICIONADAS E MODIFICADAS (API MODULAR) ---
 import {
   getMessaging,
@@ -44,6 +47,21 @@ export default function App() {
   // --- ADICIONADO ---
   // Ref para navegar ao clicar na notificação
   const navigationRef = useNavigationContainerRef();
+
+  // Carrega usuário persistido ao iniciar o app
+  useEffect(() => {
+    (async () => {
+      try {
+        const stored = await AsyncStorage.getItem("auth_user");
+        if (stored) {
+          const parsed = JSON.parse(stored);
+          setUser(parsed);
+        }
+      } catch (e) {
+        console.error("Falha ao carregar usuário persistido:", e);
+      }
+    })();
+  }, []);
 
   // --- USE EFFECT MODIFICADO ---
   useEffect(() => {
@@ -122,10 +140,18 @@ export default function App() {
 
   const handleLoginSuccess = (userData) => {
     setUser(userData);
+    // Persiste o usuário autenticado
+    AsyncStorage.setItem("auth_user", JSON.stringify(userData)).catch((e) =>
+      console.error("Falha ao salvar usuário:", e)
+    );
   };
 
   const handleLogout = () => {
     setUser(null);
+    // Remove usuário persistido
+    AsyncStorage.removeItem("auth_user").catch((e) =>
+      console.error("Falha ao apagar usuário:", e)
+    );
   };
 
   return (
