@@ -6,6 +6,7 @@ const SettingsScreen = ({ navigation, onLogout }) => {
     { title: 'Dados do Usuário', screen: 'UserData', icon: 'person-circle-outline' },
     { title: 'Dados do Idoso', screen: 'ElderlyData', icon: 'body-outline' },
     { title: 'Gerenciar Usuários', screen: 'UserList', icon: 'people-outline' },
+    { title: 'Dispositivos', screen: 'DeviceRegistry', icon: 'list-outline' },
     { title: 'Sobre o Aplicativo', screen: 'About', icon: 'information-circle-outline' }
   ];
 

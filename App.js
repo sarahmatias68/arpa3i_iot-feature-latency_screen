@@ -31,6 +31,7 @@ import MainScreen from "./MainScreen";
 import CategoryDevicesScreen from "./CategoryDevicesScreen";
 import LogsScreen from "./LogsScreen";
 import SettingsScreen from "./SettingsScreen";
+import DeviceRegistryScreen from "./DeviceRegistryScreen";
 import UserDataScreen from "./UserDataScreen";
 import ElderlyDataScreen from "./ElderlyDataScreen";
 import UserListScreen from "./UserListScreen";
@@ -136,6 +137,17 @@ export default function App() {
                   <SettingsScreen {...props} onLogout={handleLogout} />
                 )}
               </Stack.Screen>
+              <Stack.Screen
+                name="DeviceRegistry"
+                component={DeviceRegistryScreen}
+                options={{
+                  headerShown: true,
+                  title: "Dispositivos",
+                  headerStyle: { backgroundColor: "#1f2937" },
+                  headerTintColor: "#f9fafb",
+                  headerTitleStyle: { fontWeight: "bold" },
+                }}
+              />
               <Stack.Screen
                 name="UserData"
                 options={{

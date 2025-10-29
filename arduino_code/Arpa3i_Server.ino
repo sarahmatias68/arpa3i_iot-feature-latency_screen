@@ -105,6 +105,65 @@ void setup() {
 
     server.on("/alerts", HTTP_GET, handleAlertsGet);
     server.on("/acknowledge", HTTP_POST, handleAcknowledgeAlert);
+    // Endpoints de dispositivos (registro de tipos)
+    server.on("/devices", HTTP_GET, [](AsyncWebServerRequest *request){
+        String json = "[";
+        sqlite3_stmt *stmt;
+        const char *sql = "SELECT device_id, device_type FROM devices ORDER BY device_id;";
+        if (sqlite3_prepare_v2(db, sql, -1, &stmt, NULL) != SQLITE_OK) {
+            request->send(500, "application/json", "{\"error\":\"DB Error\"}");
+            return;
+        }
+        bool first = true;
+        while (sqlite3_step(stmt) == SQLITE_ROW) {
+            if (!first) json += ",";
+            first = false;
+            String id = String((const char*)sqlite3_column_text(stmt, 0));
+            String type = String((const char*)sqlite3_column_text(stmt, 1));
+            json += "{\"deviceId\":\"" + id + "\",\"deviceType\":\"" + type + "\"}";
+        }
+        json += "]";
+        sqlite3_finalize(stmt);
+        request->send(200, "application/json", json);
+    });
+    // Upsert de tipo do dispositivo
+    server.on("/devices/set", HTTP_POST, [](AsyncWebServerRequest *request){
+        if (!(request->hasParam("deviceId", true) && request->hasParam("type", true))) {
+            request->send(400, "application/json", "{\"status\":\"error\",\"message\":\"Missing params\"}");
+            return;
+        }
+        String deviceId = request->getParam("deviceId", true)->value();
+        String type = request->getParam("type", true)->value();
+        const char *sql = "INSERT INTO devices (device_id, device_type) VALUES (?, ?) ON CONFLICT(device_id) DO UPDATE SET device_type=excluded.device_type;";
+        sqlite3_stmt *stmt;
+        if (sqlite3_prepare_v2(db, sql, -1, &stmt, NULL) == SQLITE_OK) {
+            sqlite3_bind_text(stmt, 1, deviceId.c_str(), -1, SQLITE_STATIC);
+            sqlite3_bind_text(stmt, 2, type.c_str(), -1, SQLITE_STATIC);
+            if (sqlite3_step(stmt) == SQLITE_DONE) request->send(200, "application/json", "{\"status\":\"success\"}");
+            else request->send(500, "application/json", "{\"status\":\"error\"}");
+        } else {
+            request->send(500, "application/json", "{\"status\":\"error\",\"message\":\"SQL prepare failed\"}");
+        }
+        sqlite3_finalize(stmt);
+    });
+    // Remover tipo do dispositivo
+    server.on("/devices/delete", HTTP_POST, [](AsyncWebServerRequest *request){
+        if (!request->hasParam("deviceId", true)) {
+            request->send(400, "application/json", "{\"status\":\"error\",\"message\":\"Missing deviceId\"}");
+            return;
+        }
+        String deviceId = request->getParam("deviceId", true)->value();
+        const char *sql = "DELETE FROM devices WHERE device_id = ?;";
+        sqlite3_stmt *stmt;
+        if (sqlite3_prepare_v2(db, sql, -1, &stmt, NULL) == SQLITE_OK) {
+            sqlite3_bind_text(stmt, 1, deviceId.c_str(), -1, SQLITE_STATIC);
+            if (sqlite3_step(stmt) == SQLITE_DONE) request->send(200, "application/json", "{\"status\":\"success\"}");
+            else request->send(500, "application/json", "{\"status\":\"error\"}");
+        } else {
+            request->send(500, "application/json", "{\"status\":\"error\",\"message\":\"SQL prepare failed\"}");
+        }
+        sqlite3_finalize(stmt);
+    });
 
     server.begin();
 }
@@ -214,6 +273,8 @@ void initDatabase() {
     Serial.println("Verificando e criando tabelas...");
     db_exec(db, "CREATE TABLE IF NOT EXISTS alerts (id INTEGER PRIMARY KEY AUTOINCREMENT, timestamp TEXT NOT NULL, alert_type TEXT NOT NULL, message TEXT NOT NULL, acknowledged_by TEXT, acknowledged_at TEXT);");
     db_exec(db, "CREATE TABLE IF NOT EXISTS users (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL, email TEXT UNIQUE NOT NULL, password TEXT NOT NULL);");
+    // Registro de dispositivos e seus tipos definidos pelo app
+    db_exec(db, "CREATE TABLE IF NOT EXISTS devices (device_id TEXT PRIMARY KEY, device_type TEXT NOT NULL);");
     if (db_exec(db, "CREATE TABLE IF NOT EXISTS elderly_data (id INTEGER PRIMARY KEY CHECK (id = 1), name TEXT, age INTEGER, family_contact_name TEXT, family_contact_phone TEXT, observations TEXT);") == SQLITE_OK) {
         db_exec(db, "INSERT OR IGNORE INTO elderly_data (id) VALUES (1);");
     }

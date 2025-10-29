@@ -70,9 +70,13 @@ interface AlertsContextType {
   getNewDevices: () => DeviceStatus[];
   acknowledgeAlert: (deviceId: string, alertType: "PANICO" | "QUEDA") => void;
   wristbandPanicActive: boolean;
+  requestSystemBroadcast: () => void;
+  addDevice: (deviceId: string) => Promise<void>;
+  removeDevice: (deviceId: string) => Promise<void>;
 }
 
-const WEBSOCKET_URL = "ws://192.168.2.115:86/ws";
+const WEBSOCKET_URL = "ws://192.168.1.2:86/ws";
+const SERVER_HTTP_BASE = "http://192.168.1.2:86";
 const DEVICE_TIMEOUT_MS = 11 * 60 * 1000; // 11 minutos
 
 const AlertsContext = createContext<AlertsContextType | undefined>(undefined);
@@ -137,6 +141,19 @@ export const AlertsProvider: React.FC<AlertsProviderProps> = ({
             deviceType: "gas_fumaca",
           }
         }));
+        // Ao conectar, solicita um broadcast de status para reduzir a janela de offline
+        setTimeout(() => {
+          if (ws.current?.ws?.readyState === WebSocket.OPEN) {
+            const message = JSON.stringify({
+              type: "SYSTEM_BROADCAST",
+              deviceId: user?.name || "app_mobile",
+              data: {
+                broadcast_type: "REQUEST_DEVICE_STATUS"
+              }
+            });
+            ws.current.ws.send(message);
+          }
+        }, 300);
       },
 
       onMessage: (event: { data: string }) => {
@@ -227,6 +244,20 @@ export const AlertsProvider: React.FC<AlertsProviderProps> = ({
           else if (data.type === "sensor") {
             setSensorState(data.tipo);
           }
+          // Trata mensagens diretas do servidor com status de dispositivo
+          else if (data.type === "DEVICE_STATUS") {
+            const statusStr = (data.status as string) || "offline";
+            const isOnline = statusStr.toLowerCase() === "online";
+            setDevicesById(prev => ({
+              ...prev,
+              [deviceId]: {
+                ...(prev[deviceId] || { deviceId }),
+                status: isOnline ? "online" : "offline",
+                connected: isOnline,
+                lastSeen: isOnline ? Date.now() : (prev[deviceId]?.lastSeen || 0),
+              }
+            }));
+          }
           else if (data.type === "SYSTEM_BROADCAST") {
             const broadcastData = data.data;
             
@@ -314,46 +345,68 @@ export const AlertsProvider: React.FC<AlertsProviderProps> = ({
   }, [user, connect]);
 
   useEffect(() => {
-    const loadPersistedData = async () => {
+    const loadInitialData = async () => {
       try {
+        // 1) Carrega IDs conhecidos (apenas para exibir entries offline)
         const knownIdsJson = await AsyncStorage.getItem('knownDeviceIds');
-        if (!knownIdsJson) return;
+        const knownIds: string[] = knownIdsJson ? JSON.parse(knownIdsJson) : [];
 
-        const knownIds = JSON.parse(knownIdsJson);
-        const initialDevicesState: Record<string, DeviceStatus> = {};
+        // 2) Busca tipos do servidor
+        let serverTypes: Record<string, DeviceType | undefined> = {};
+        try {
+          const res = await fetch(`${SERVER_HTTP_BASE}/devices`);
+          if (res.ok) {
+            const items: Array<{ deviceId: string; deviceType: DeviceType } > = await res.json();
+            items.forEach(it => { serverTypes[it.deviceId] = it.deviceType; });
+          } else {
+            console.warn("Falha ao obter /devices:", res.status);
+          }
+        } catch (e) {
+          console.warn("Erro de rede ao obter /devices:", e);
+        }
 
-        for (const deviceId of knownIds) {
-          const persistedType = await AsyncStorage.getItem(`deviceType_${deviceId}`);
-          const persistedAlertJson = await AsyncStorage.getItem(`deviceAlert_${deviceId}`);
-          
-          let lastAlertType = undefined;
+        // 3) Reconstrói estado inicial
+        const initial: Record<string, DeviceStatus> = {};
+        for (const id of knownIds) {
+          const persistedAlertJson = await AsyncStorage.getItem(`deviceAlert_${id}`);
+          let lastAlertType = undefined as DeviceStatus["lastAlertType"]; 
           if (persistedAlertJson) {
             const alertData = JSON.parse(persistedAlertJson);
-            // Verifica se o alerta ainda é válido (menos de 24 horas)
             if (Date.now() - alertData.timestamp < 24 * 60 * 60 * 1000) {
               lastAlertType = alertData.alertType;
             } else {
-              // Remove alertas expirados
-              await AsyncStorage.removeItem(`deviceAlert_${deviceId}`);
+              await AsyncStorage.removeItem(`deviceAlert_${id}`);
             }
           }
-          
-          initialDevicesState[deviceId] = {
-            deviceId,
+          initial[id] = {
+            deviceId: id,
             status: 'offline',
             connected: false,
             lastSeen: 0,
-            deviceType: persistedType as DeviceType || undefined,
-            lastAlertType: lastAlertType,
+            deviceType: serverTypes[id],
+            lastAlertType,
           };
         }
-        setDevicesById(initialDevicesState);
+        // Inclui quaisquer devices que só existam no servidor (têm tipo mas não estão em knownIds)
+        Object.keys(serverTypes).forEach((id) => {
+          if (!initial[id]) {
+            initial[id] = {
+              deviceId: id,
+              status: 'offline',
+              connected: false,
+              lastSeen: 0,
+              deviceType: serverTypes[id],
+            };
+          }
+        });
+
+        setDevicesById(initial);
       } catch (error) {
-        console.error("Erro ao carregar tipos de dispositivos:", error);
+        console.error("Erro ao carregar dados iniciais:", error);
       }
     };
 
-    loadPersistedData();
+    loadInitialData();
   }, []);
 
   useEffect(() => {
@@ -417,6 +470,7 @@ export const AlertsProvider: React.FC<AlertsProviderProps> = ({
 
   const updateDeviceType = async (deviceId: string, newType: DeviceType | undefined) => {
     try {
+      // Atualiza estado local imediatamente
       setDevicesById(prev => ({
         ...prev,
         [deviceId]: {
@@ -425,13 +479,94 @@ export const AlertsProvider: React.FC<AlertsProviderProps> = ({
           deviceType: newType,
         }
       }));
+
+      // Persiste no servidor
       if (newType === undefined) {
-        await AsyncStorage.removeItem(`deviceType_${deviceId}`);
+        // Remover tipo => deletar do registro
+        const body = new URLSearchParams();
+        body.append('deviceId', deviceId);
+        const res = await fetch(`${SERVER_HTTP_BASE}/devices/delete`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+          body: body.toString(),
+        });
+        if (!res.ok) console.warn('Falha ao remover tipo no servidor:', res.status);
       } else {
-        await AsyncStorage.setItem(`deviceType_${deviceId}`, newType);
+        // Definir/atualizar tipo => upsert
+        const body = new URLSearchParams();
+        body.append('deviceId', deviceId);
+        body.append('type', newType);
+        const res = await fetch(`${SERVER_HTTP_BASE}/devices/set`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+          body: body.toString(),
+        });
+        if (!res.ok) console.warn('Falha ao salvar tipo no servidor:', res.status);
       }
     } catch (error) {
-      console.error("Erro ao atualizar tipo do dispositivo:", error);
+      console.error("Erro ao atualizar tipo do dispositivo (servidor):", error);
+    }
+  };
+
+  // Solicita explicitamente um broadcast de status dos dispositivos
+  const requestSystemBroadcast = () => {
+    try {
+      if (ws.current?.ws?.readyState === WebSocket.OPEN) {
+        const message = JSON.stringify({
+          type: "SYSTEM_BROADCAST",
+          deviceId: user?.name || "app_mobile",
+          data: {
+            broadcast_type: "REQUEST_DEVICE_STATUS"
+          }
+        });
+        ws.current.ws.send(message);
+      } else {
+        console.log("WebSocket não está aberto para solicitar broadcast.");
+      }
+    } catch (e) {
+      console.error("Falha ao solicitar SYSTEM_BROADCAST:", e);
+    }
+  };
+
+  // Adiciona manualmente um dispositivo ao registro local e persiste
+  const addDevice = async (deviceId: string) => {
+    try {
+      setDevicesById(prev => ({
+        ...prev,
+        [deviceId]: prev[deviceId] || {
+          deviceId,
+          status: 'offline',
+          connected: false,
+          lastSeen: 0,
+        }
+      }));
+      const existingIdsJson = await AsyncStorage.getItem('knownDeviceIds');
+      const existingIds: string[] = existingIdsJson ? JSON.parse(existingIdsJson) : [];
+      if (!existingIds.includes(deviceId)) {
+        const newIds = [...existingIds, deviceId];
+        await AsyncStorage.setItem('knownDeviceIds', JSON.stringify(newIds));
+      }
+    } catch (e) {
+      console.error("Erro ao adicionar dispositivo:", e);
+    }
+  };
+
+  // Remove um dispositivo do registro local e limpa persistências relacionadas
+  const removeDevice = async (deviceId: string) => {
+    try {
+      setDevicesById(prev => {
+        const copy = { ...prev };
+        delete copy[deviceId];
+        return copy;
+      });
+      const existingIdsJson = await AsyncStorage.getItem('knownDeviceIds');
+      const existingIds: string[] = existingIdsJson ? JSON.parse(existingIdsJson) : [];
+      const newIds = existingIds.filter(id => id !== deviceId);
+      await AsyncStorage.setItem('knownDeviceIds', JSON.stringify(newIds));
+      await AsyncStorage.removeItem(`deviceType_${deviceId}`);
+      await AsyncStorage.removeItem(`deviceAlert_${deviceId}`);
+    } catch (e) {
+      console.error("Erro ao remover dispositivo:", e);
     }
   };
 
@@ -456,6 +591,9 @@ export const AlertsProvider: React.FC<AlertsProviderProps> = ({
     getNewDevices,
     acknowledgeAlert,
     wristbandPanicActive,
+    requestSystemBroadcast,
+    addDevice,
+    removeDevice,
   };
 
   return (
