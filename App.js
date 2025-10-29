@@ -11,6 +11,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { AlertsProvider } from "./AlertsContext";
 // IMPORTAÇÃO MODIFICADA
 import { registerForFcmAndSendToBackend } from "./notificationService";
+import NotificationHandler from "./NotificationHandler";
 
 // --- IMPORTAÇÕES ADICIONADAS E MODIFICADAS (API MODULAR) ---
 import {
@@ -45,7 +46,7 @@ export default function App() {
   // Ref para navegar ao clicar na notificação
   const navigationRef = useNavigationContainerRef();
 
-  // --- USE EFFECT MODIFICADO ---
+  // --- USE EFFECT: apenas registro do token push ---
   useEffect(() => {
     // Se não há usuário, não faz nada (e limpa listeners antigos se houver)
     if (!user) {
@@ -65,59 +66,6 @@ export default function App() {
       })();
     }
 
-    // --- SINTAXE MODULAR ADOTADA ---
-    const messaging = getMessaging();
-
-    // 2. LISTENER DE FOREGROUND (APP ABERTO)
-    const unsubscribeOnMessage = onMessage(messaging, async (remoteMessage) => {
-      console.log("Mensagem recebida em Foreground:", remoteMessage);
-
-      // Usa o expo-notifications SÓ para exibir a notificação
-      await Notifications.scheduleNotificationAsync({
-        content: {
-          title: remoteMessage.notification?.title || "Novo Alerta",
-          body: remoteMessage.notification?.body || "",
-          data: remoteMessage.data,
-        },
-        trigger: null, // Exibe imediatamente
-      });
-    });
-
-    // 3. LISTENER DE TAPS (APP EM BACKGROUND)
-    const unsubscribeOnNotificationOpened = onNotificationOpenedApp(
-      messaging,
-      (remoteMessage) => {
-        console.log(
-          "Notificação fez o app abrir (background):",
-          remoteMessage
-        );
-        // Exemplo: Navega para a tela de Histórico/Logs
-        if (navigationRef.isReady()) {
-          navigationRef.navigate("History");
-        }
-      }
-    );
-
-    // 4. CHECAGEM DE TAP (APP FECHADO)
-    getInitialNotification(messaging).then((remoteMessage) => {
-      if (remoteMessage) {
-        console.log(
-          "Notificação fez o app abrir (fechado):",
-          remoteMessage
-        );
-        // Você pode querer guardar isso em um state e navegar
-        // quando o navigationRef estiver pronto
-        if (navigationRef.isReady()) {
-          navigationRef.navigate("History");
-        }
-      }
-    });
-
-    // Função de limpeza (roda quando o 'user' muda, ex: logout)
-    return () => {
-      unsubscribeOnMessage();
-      unsubscribeOnNotificationOpened();
-    };
   }, [user]); // Dependência [user] está correta
 
   const handleLoginSuccess = (userData) => {
@@ -132,6 +80,7 @@ export default function App() {
     // REF ADICIONADA AO CONTAINER
     <NavigationContainer ref={navigationRef}>
       <AlertsProvider user={user}>
+        <NotificationHandler isAuthenticated={!!user} />
         <Stack.Navigator screenOptions={{ headerShown: false }}>
           {user ? (
             // Grupo de Telas Principais (App)
