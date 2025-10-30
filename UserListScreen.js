@@ -3,7 +3,7 @@ import { View, Text, StyleSheet, FlatList, TouchableOpacity, Alert, ActivityIndi
 import { useFocusEffect } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 
-const API_URL = 'http://192.168.1.2:86';
+const API_URL = 'http://192.168.1.5:86';
 
 const UserListScreen = () => {
   const [users, setUsers] = useState([]);

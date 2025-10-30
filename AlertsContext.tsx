@@ -75,8 +75,8 @@ interface AlertsContextType {
   removeDevice: (deviceId: string) => Promise<void>;
 }
 
-const WEBSOCKET_URL = "ws://192.168.1.2:86/ws";
-const SERVER_HTTP_BASE = "http://192.168.1.2:86";
+const WEBSOCKET_URL = "ws://192.168.1.5:86/ws";
+const SERVER_HTTP_BASE = "http://192.168.1.5:86";
 const DEVICE_TIMEOUT_MS = 11 * 60 * 1000; // 11 minutos
 
 const AlertsContext = createContext<AlertsContextType | undefined>(undefined);

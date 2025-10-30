@@ -2,7 +2,7 @@ import { useState, useCallback } from 'react';
 import { View, Text, TextInput, StyleSheet, ScrollView, ActivityIndicator, Alert, TouchableOpacity, KeyboardAvoidingView, Platform } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 
-const API_URL = 'http://192.168.1.2:86';
+const API_URL = 'http://192.168.1.5:86';
 
 const ElderlyDataScreen = () => {
   const [elderlyData, setElderlyData] = useState(null);
