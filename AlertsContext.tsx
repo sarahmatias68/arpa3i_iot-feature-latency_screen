@@ -32,6 +32,7 @@ interface DeviceStatus {
   heapB?: number;
   rssiDbm?: number;
   lastAlertType?: "PANICO" | "QUEDA";
+  lastAlertAt?: number; // epoch ms
   deviceType?: string;
 }
 
@@ -53,16 +54,25 @@ type ConnectionStatus =
 type SensorState = "Servidor Desconectado" | "" | string;
 
 interface ActiveAlert {
-    title: string;
-    message: string;
-    type: "PANICO" | "QUEDA";
+  title: string;
+  message: string;
+  type: "PANICO" | "QUEDA";
+  timestamp?: number; // epoch ms
+}
+
+interface AlertItem {
+  id: string; // server alert id ou hash local
+  deviceId: string;
+  type: "PANICO" | "QUEDA";
+  message: string;
+  timestamp: number; // epoch ms
 }
 
 interface AlertsContextType {
   connectionStatus: ConnectionStatus;
   sensorState: SensorState;
   fallState: FallState;
-  activeAlert: ActiveAlert | null;
+  activeAlert: ActiveAlert | null; // compat: reflete o primeiro item da fila
   dismissActiveAlert: () => void;
   devicesById: Record<string, DeviceStatus>;
   deviceTypes: DeviceTypeConfig[];
@@ -74,6 +84,8 @@ interface AlertsContextType {
   requestSystemBroadcast: () => void;
   addDevice: (deviceId: string) => Promise<void>;
   removeDevice: (deviceId: string) => Promise<void>;
+  // fila
+  alertsQueue: AlertItem[];
 }
 
 const WEBSOCKET_URL = "ws://192.168.1.7:86/ws";
@@ -103,6 +115,7 @@ export const AlertsProvider: React.FC<AlertsProviderProps> = ({
   const [sensorState, setSensorState] = useState<SensorState>("Desconectado");
   const [fallState, setFallState] = useState<FallState>("Desconectado");
   const [activeAlert, setActiveAlert] = useState<ActiveAlert | null>(null);
+  const [alertsQueue, setAlertsQueue] = useState<AlertItem[]>([]);
   const [wristbandPanicActive, setWristbandPanicActive] = useState<boolean>(false);
   const [devicesById, setDevicesById] = useState<Record<string, DeviceStatus>>({});
   const ws = useRef<WsConnection | null>(null);
@@ -149,63 +162,59 @@ export const AlertsProvider: React.FC<AlertsProviderProps> = ({
           try {
             const res = await fetch(`${SERVER_HTTP_BASE}/alerts?status=pending`);
             if (res.ok) {
-              const alerts = await res.json(); // [{id,timestamp,alert_type,message,acknowledged_by,acknowledged_at}]
-              // Pega o mais recente de PANICO/QUEDA
-              const latestCritical = alerts.find((a: any) => a.alert_type === 'PANICO' || a.alert_type === 'QUEDA');
-              if (latestCritical) {
-                // Evita reexibir o mesmo alerta
-                const lastSeenId = await AsyncStorage.getItem('lastSeenServerAlertId');
-                if (String(latestCritical.id) !== String(lastSeenId)) {
-                  // Verifica janela de 24h
-                  const ts = new Date(latestCritical.timestamp).getTime();
-                  if (!isNaN(ts) && (Date.now() - ts) < 24 * 60 * 60 * 1000) {
-                    // Tenta extrair deviceId do message
-                    let parsedDeviceId = '' as string;
-                    const msg: string = latestCritical.message || '';
-                    // Formatos esperados do servidor (ver Arpa3i_Server.ino):
-                    //  PANICO: "Botao de panico acionado por: <deviceId>"
-                    //  QUEDA:  "Queda detectada por: <deviceId> (<local>)"
-                    const mP = msg.match(/panico acionado por:\s*([^\s]+)/i);
-                    const mQ = msg.match(/Queda detectada por:\s*([^\s]+)/i);
-                    if (mP && mP[1]) parsedDeviceId = mP[1];
-                    else if (mQ && mQ[1]) parsedDeviceId = mQ[1];
+              const alerts: any[] = await res.json();
+              // Filtra apenas PANICO/QUEDA, ordena por timestamp desc e enfileira todos os não vistos
+              const criticals = alerts
+                .filter(a => a.alert_type === 'PANICO' || a.alert_type === 'QUEDA')
+                .sort((a, b) => {
+                  const ta = new Date(a.timestamp).getTime();
+                  const tb = new Date(b.timestamp).getTime();
+                  return tb - ta;
+                });
 
-                    if (latestCritical.alert_type === 'PANICO') {
-                      setActiveAlert({
-                        title: '🚨 ALERTA DE PÂNICO!',
-                        message: parsedDeviceId ? `Botão de pânico acionado pelo dispositivo '${parsedDeviceId}'.` : 'Botão de pânico acionado.',
-                        type: 'PANICO',
-                      });
-                      setWristbandPanicActive(true);
-                      if (parsedDeviceId) {
-                        setDevicesById(prev => ({
-                          ...prev,
-                          [parsedDeviceId]: {
-                            ...(prev[parsedDeviceId] || { deviceId: parsedDeviceId, status: 'offline', connected: false, lastSeen: 0 }),
-                            lastAlertType: 'PANICO',
-                          }
-                        }));
-                      }
-                    } else if (latestCritical.alert_type === 'QUEDA') {
-                      setActiveAlert({
-                        title: '⚠️ ALERTA DE QUEDA!',
-                        message: parsedDeviceId ? `Queda detectada pelo dispositivo '${parsedDeviceId}'.` : 'Queda detectada.',
-                        type: 'QUEDA',
-                      });
-                      setFallState({ status: 'Queda Detectada', comodo: 'indefinido', dispositivo: parsedDeviceId || 'desconhecido' });
-                      if (parsedDeviceId) {
-                        setDevicesById(prev => ({
-                          ...prev,
-                          [parsedDeviceId]: {
-                            ...(prev[parsedDeviceId] || { deviceId: parsedDeviceId, status: 'offline', connected: false, lastSeen: 0 }),
-                            lastAlertType: 'QUEDA',
-                          }
-                        }));
-                      }
+              const seenJson = await AsyncStorage.getItem('seenServerAlertIds');
+              const seen: Set<string> = new Set(seenJson ? JSON.parse(seenJson) : []);
+
+              const toEnqueue: AlertItem[] = [];
+              for (const it of criticals) {
+                const id = String(it.id ?? `${it.alert_type}-${it.timestamp}-${it.message}`);
+                if (seen.has(id)) continue;
+                const ts = new Date(it.timestamp).getTime();
+                if (isNaN(ts) || (Date.now() - ts) > 24 * 60 * 60 * 1000) continue;
+
+                // extrai deviceId da mensagem como fallback
+                const msg: string = it.message || '';
+                let parsedDeviceId = '';
+                const mP = msg.match(/panico acionado por:\s*([^\s]+)/i);
+                const mQ = msg.match(/Queda detectada por:\s*([^\s]+)/i);
+                if (mP && mP[1]) parsedDeviceId = mP[1];
+                else if (mQ && mQ[1]) parsedDeviceId = mQ[1];
+
+                toEnqueue.push({
+                  id,
+                  deviceId: parsedDeviceId || 'desconhecido',
+                  type: it.alert_type,
+                  message: msg,
+                  timestamp: ts,
+                });
+
+                seen.add(id);
+
+                if (parsedDeviceId) {
+                  setDevicesById(prev => ({
+                    ...prev,
+                    [parsedDeviceId]: {
+                      ...(prev[parsedDeviceId] || { deviceId: parsedDeviceId, status: 'offline', connected: false, lastSeen: 0 }),
+                      lastAlertType: it.alert_type,
+                      lastAlertAt: ts,
                     }
-                    await AsyncStorage.setItem('lastSeenServerAlertId', String(latestCritical.id));
-                  }
+                  }));
                 }
+              }
+
+              if (toEnqueue.length) {
+                setAlertsQueue(prev => [...prev, ...toEnqueue]);
+                await AsyncStorage.setItem('seenServerAlertIds', JSON.stringify(Array.from(seen)));
               }
             } else {
               console.warn('Falha ao consultar /alerts:', res.status);
@@ -259,7 +268,7 @@ export const AlertsProvider: React.FC<AlertsProviderProps> = ({
 
           if (data.type === "ALERTA") {
              if (data.sub_type === "PANICO") {
-                setDevicesById(prev => ({
+               setDevicesById(prev => ({
                     ...prev,
                     [deviceId]: {
                         ...(prev[deviceId] || { deviceId }),
@@ -267,6 +276,7 @@ export const AlertsProvider: React.FC<AlertsProviderProps> = ({
                         connected: true,
                         status: "online",
                         lastSeen: Date.now(),
+                        lastAlertAt: Date.now(),
                     }
                 }));
                 // Persiste o alerta
@@ -274,12 +284,17 @@ export const AlertsProvider: React.FC<AlertsProviderProps> = ({
                   alertType: "PANICO",
                   timestamp: Date.now()
                 })).catch(e => console.error("Erro ao salvar alerta:", e));
-                
-                setActiveAlert({
-                    title: "🚨 ALERTA DE PÂNICO!",
+                // Enfileira
+                setAlertsQueue(prev => ([
+                  ...prev,
+                  {
+                    id: `local-${deviceId}-PANICO-${Date.now()}`,
+                    deviceId,
+                    type: 'PANICO',
                     message: `Botão de pânico acionado pelo dispositivo '${deviceId}'.`,
-                    type: "PANICO"
-                });
+                    timestamp: Date.now(),
+                  }
+                ]));
                 setWristbandPanicActive(true);
              }
              // <<-- CORREÇÃO: Lógica para Alerta de Queda adicionada -->>
@@ -293,6 +308,7 @@ export const AlertsProvider: React.FC<AlertsProviderProps> = ({
                         connected: true,
                         status: "online",
                         lastSeen: Date.now(),
+                        lastAlertAt: Date.now(),
                     }
                 }));
                 // Persiste o alerta
@@ -307,11 +323,17 @@ export const AlertsProvider: React.FC<AlertsProviderProps> = ({
                     dispositivo: deviceId,
                 };
                 setFallState(fallDetails);
-                setActiveAlert({
-                    title: "⚠️ ALERTA DE QUEDA!",
+                // Enfileira
+                setAlertsQueue(prev => ([
+                  ...prev,
+                  {
+                    id: `local-${deviceId}-QUEDA-${Date.now()}`,
+                    deviceId,
+                    type: 'QUEDA',
                     message: `Queda detectada em '${local}' pelo dispositivo '${deviceId}'.`,
-                    type: "QUEDA"
-                });
+                    timestamp: Date.now(),
+                  }
+                ]));
              }
           }
           else if (data.type === "sensor") {
@@ -417,6 +439,21 @@ export const AlertsProvider: React.FC<AlertsProviderProps> = ({
     };
   }, [user, connect]);
 
+  // Mantém activeAlert sempre refletindo o primeiro item da fila
+  useEffect(() => {
+    if (alertsQueue.length > 0) {
+      const first = alertsQueue[0];
+      setActiveAlert({
+        title: first.type === 'PANICO' ? '🚨 ALERTA DE PÂNICO!' : '⚠️ ALERTA DE QUEDA!',
+        message: first.message,
+        type: first.type,
+        timestamp: first.timestamp,
+      });
+    } else {
+      setActiveAlert(null);
+    }
+  }, [alertsQueue]);
+
   useEffect(() => {
     const loadInitialData = async () => {
       try {
@@ -475,21 +512,31 @@ export const AlertsProvider: React.FC<AlertsProviderProps> = ({
 
         setDevicesById(initial);
 
-        // Reidrata visual do alerta se houver algum dispositivo com lastAlertType
+        // Reidrata visual do alerta: coloca na fila o primeiro que tiver lastAlertType
         const firstWithAlert = Object.values(initial).find(d => d.lastAlertType);
         if (firstWithAlert?.lastAlertType === "PANICO") {
-          setActiveAlert({
-            title: "🚨 ALERTA DE PÂNICO!",
-            message: `Botão de pânico acionado pelo dispositivo '${firstWithAlert.deviceId}'.`,
-            type: "PANICO",
-          });
+          setAlertsQueue(prev => ([
+            ...prev,
+            {
+              id: `rehydrate-${firstWithAlert.deviceId}-PANICO-${Date.now()}`,
+              deviceId: firstWithAlert.deviceId,
+              type: 'PANICO',
+              message: `Botão de pânico acionado pelo dispositivo '${firstWithAlert.deviceId}'.`,
+              timestamp: Date.now(),
+            }
+          ]));
           setWristbandPanicActive(true);
         } else if (firstWithAlert?.lastAlertType === "QUEDA") {
-          setActiveAlert({
-            title: "⚠️ ALERTA DE QUEDA!",
-            message: `Queda detectada pelo dispositivo '${firstWithAlert.deviceId}'.`,
-            type: "QUEDA",
-          });
+          setAlertsQueue(prev => ([
+            ...prev,
+            {
+              id: `rehydrate-${firstWithAlert.deviceId}-QUEDA-${Date.now()}`,
+              deviceId: firstWithAlert.deviceId,
+              type: 'QUEDA',
+              message: `Queda detectada pelo dispositivo '${firstWithAlert.deviceId}'.`,
+              timestamp: Date.now(),
+            }
+          ]));
           setFallState({
             status: "Queda Detectada",
             comodo: "indefinido",
@@ -526,7 +573,8 @@ export const AlertsProvider: React.FC<AlertsProviderProps> = ({
   }, []);
   
   const dismissActiveAlert = () => {
-    setActiveAlert(null);
+    // remove o primeiro item da fila
+    setAlertsQueue(prev => prev.slice(1));
   };
 
   // <<-- CORREÇÃO: Função unificada para dar ciência dos alertas -->>
@@ -689,6 +737,7 @@ export const AlertsProvider: React.FC<AlertsProviderProps> = ({
     requestSystemBroadcast,
     addDevice,
     removeDevice,
+    alertsQueue,
   };
 
   return (
@@ -699,6 +748,11 @@ export const AlertsProvider: React.FC<AlertsProviderProps> = ({
           <View style={styles.alertBox}>
             <Text style={styles.alertTitle}>{activeAlert.title}</Text>
             <Text style={styles.alertMessage}>{activeAlert.message}</Text>
+            {!!activeAlert.timestamp && (
+              <Text style={styles.alertTimestamp}>
+                {new Date(activeAlert.timestamp).toLocaleString()}
+              </Text>
+            )}
             <TouchableOpacity style={styles.alertButton} onPress={dismissActiveAlert}>
               <Text style={styles.alertButtonText}>OK</Text>
             </TouchableOpacity>
@@ -734,6 +788,11 @@ const styles = StyleSheet.create({
   alertMessage: {
     fontSize: 14,
     color: '#e5e7eb',
+    marginBottom: 12,
+  },
+  alertTimestamp: {
+    fontSize: 12,
+    color: '#9ca3af',
     marginBottom: 12,
   },
   alertButton: {

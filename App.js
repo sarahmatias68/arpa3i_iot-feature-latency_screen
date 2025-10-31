@@ -14,13 +14,9 @@ import { registerForFcmAndSendToBackend } from "./notificationService";
 import NotificationHandler from "./NotificationHandler";
 
 // --- IMPORTAÇÕES ADICIONADAS E MODIFICADAS (API MODULAR) ---
-import {
-  getMessaging,
-  onMessage,
-  onNotificationOpenedApp,
-  getInitialNotification,
-} from "@react-native-firebase/messaging";
+import messaging from "@react-native-firebase/messaging";
 import * as Notifications from "expo-notifications";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 // --- FIM DAS IMPORTAÇÕES ---
 
 // Telas
@@ -42,10 +38,26 @@ const Stack = createStackNavigator();
 export default function App() {
   const [expoPushToken, setExpoPushToken] = useState("");
   const [user, setUser] = useState(null); // Estado para controlar o usuário logado
+  const [pendingNav, setPendingNav] = useState(null); // guarda navegação pendente ao clicar na notificação sem sessão
 
   // --- ADICIONADO ---
   // Ref para navegar ao clicar na notificação
   const navigationRef = useNavigationContainerRef();
+
+  // --- USE EFFECT: auto-login (persistência de sessão) ---
+  useEffect(() => {
+    (async () => {
+      try {
+        const json = await AsyncStorage.getItem("arp_user");
+        if (json) {
+          const savedUser = JSON.parse(json);
+          setUser(savedUser);
+        }
+      } catch (e) {
+        console.warn("Falha ao carregar sessão persistida:", e);
+      }
+    })();
+  }, []);
 
   // --- USE EFFECT: apenas registro do token push ---
   useEffect(() => {
@@ -71,11 +83,59 @@ export default function App() {
 
   const handleLoginSuccess = (userData) => {
     setUser(userData);
+    // persiste sessão
+    AsyncStorage.setItem("arp_user", JSON.stringify(userData)).catch(() => {});
+    // se havia navegação pendente da notificação, resolve agora
+    if (pendingNav) {
+      try {
+        const { routeName, params } = pendingNav;
+        if (navigationRef.current && routeName) {
+          navigationRef.current.navigate(routeName, params || {});
+        }
+      } finally {
+        setPendingNav(null);
+      }
+    }
   };
 
   const handleLogout = () => {
     setUser(null);
+    AsyncStorage.removeItem("arp_user").catch(() => {});
   };
+
+  // --- USE EFFECT: FCM click handling (app em background) ---
+  useEffect(() => {
+    const unsubscribe = messaging().onNotificationOpenedApp((remoteMessage) => {
+      if (!remoteMessage) return;
+      const deviceId = remoteMessage.data?.deviceId;
+      const alertType = remoteMessage.data?.alertType;
+      const params = deviceId ? { focusDeviceId: deviceId, alertType } : {};
+      const action = { routeName: "Main", params };
+      if (user) {
+        navigationRef.current?.navigate(action.routeName, action.params);
+      } else {
+        setPendingNav(action);
+      }
+    });
+    return unsubscribe;
+  }, [user, navigationRef]);
+
+  // --- USE EFFECT: FCM click handling (app fechado - cold start) ---
+  useEffect(() => {
+    (async () => {
+      const remoteMessage = await messaging().getInitialNotification();
+      if (!remoteMessage) return;
+      const deviceId = remoteMessage.data?.deviceId;
+      const alertType = remoteMessage.data?.alertType;
+      const params = deviceId ? { focusDeviceId: deviceId, alertType } : {};
+      const action = { routeName: "Main", params };
+      if (user) {
+        navigationRef.current?.navigate(action.routeName, action.params);
+      } else {
+        setPendingNav(action);
+      }
+    })();
+  }, [user, navigationRef]);
 
   return (
     // REF ADICIONADA AO CONTAINER
