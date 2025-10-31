@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { View, Text, TextInput, TouchableOpacity, StyleSheet, Alert, ActivityIndicator, KeyboardAvoidingView, TouchableWithoutFeedback, Keyboard, Platform } from 'react-native';
 
-const API_URL = 'http://192.168.1.5:86'; 
+const API_URL = 'http://192.168.1.7:86'; 
 
 const SignUpScreen = ({ navigation }) => {
   const [name, setName] = useState('');

@@ -7,6 +7,7 @@ import React, {
   useRef,
   ReactNode,
 } from "react";
+import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { WsConnection } from "./wsConnection";
 import { User } from "./types/model";
@@ -75,8 +76,8 @@ interface AlertsContextType {
   removeDevice: (deviceId: string) => Promise<void>;
 }
 
-const WEBSOCKET_URL = "ws://192.168.1.5:86/ws";
-const SERVER_HTTP_BASE = "http://192.168.1.5:86";
+const WEBSOCKET_URL = "ws://192.168.1.7:86/ws";
+const SERVER_HTTP_BASE = "http://192.168.1.7:86";
 const DEVICE_TIMEOUT_MS = 11 * 60 * 1000; // 11 minutos
 
 const AlertsContext = createContext<AlertsContextType | undefined>(undefined);
@@ -140,7 +141,79 @@ export const AlertsProvider: React.FC<AlertsProviderProps> = ({
             lastSeen: Date.now(),
             deviceType: "gas_fumaca",
           }
+
         }));
+
+        // Busca no servidor por alertas pendentes recentes (fallback quando o app estava fechado no momento do alerta)
+        (async () => {
+          try {
+            const res = await fetch(`${SERVER_HTTP_BASE}/alerts?status=pending`);
+            if (res.ok) {
+              const alerts = await res.json(); // [{id,timestamp,alert_type,message,acknowledged_by,acknowledged_at}]
+              // Pega o mais recente de PANICO/QUEDA
+              const latestCritical = alerts.find((a: any) => a.alert_type === 'PANICO' || a.alert_type === 'QUEDA');
+              if (latestCritical) {
+                // Evita reexibir o mesmo alerta
+                const lastSeenId = await AsyncStorage.getItem('lastSeenServerAlertId');
+                if (String(latestCritical.id) !== String(lastSeenId)) {
+                  // Verifica janela de 24h
+                  const ts = new Date(latestCritical.timestamp).getTime();
+                  if (!isNaN(ts) && (Date.now() - ts) < 24 * 60 * 60 * 1000) {
+                    // Tenta extrair deviceId do message
+                    let parsedDeviceId = '' as string;
+                    const msg: string = latestCritical.message || '';
+                    // Formatos esperados do servidor (ver Arpa3i_Server.ino):
+                    //  PANICO: "Botao de panico acionado por: <deviceId>"
+                    //  QUEDA:  "Queda detectada por: <deviceId> (<local>)"
+                    const mP = msg.match(/panico acionado por:\s*([^\s]+)/i);
+                    const mQ = msg.match(/Queda detectada por:\s*([^\s]+)/i);
+                    if (mP && mP[1]) parsedDeviceId = mP[1];
+                    else if (mQ && mQ[1]) parsedDeviceId = mQ[1];
+
+                    if (latestCritical.alert_type === 'PANICO') {
+                      setActiveAlert({
+                        title: '🚨 ALERTA DE PÂNICO!',
+                        message: parsedDeviceId ? `Botão de pânico acionado pelo dispositivo '${parsedDeviceId}'.` : 'Botão de pânico acionado.',
+                        type: 'PANICO',
+                      });
+                      setWristbandPanicActive(true);
+                      if (parsedDeviceId) {
+                        setDevicesById(prev => ({
+                          ...prev,
+                          [parsedDeviceId]: {
+                            ...(prev[parsedDeviceId] || { deviceId: parsedDeviceId, status: 'offline', connected: false, lastSeen: 0 }),
+                            lastAlertType: 'PANICO',
+                          }
+                        }));
+                      }
+                    } else if (latestCritical.alert_type === 'QUEDA') {
+                      setActiveAlert({
+                        title: '⚠️ ALERTA DE QUEDA!',
+                        message: parsedDeviceId ? `Queda detectada pelo dispositivo '${parsedDeviceId}'.` : 'Queda detectada.',
+                        type: 'QUEDA',
+                      });
+                      setFallState({ status: 'Queda Detectada', comodo: 'indefinido', dispositivo: parsedDeviceId || 'desconhecido' });
+                      if (parsedDeviceId) {
+                        setDevicesById(prev => ({
+                          ...prev,
+                          [parsedDeviceId]: {
+                            ...(prev[parsedDeviceId] || { deviceId: parsedDeviceId, status: 'offline', connected: false, lastSeen: 0 }),
+                            lastAlertType: 'QUEDA',
+                          }
+                        }));
+                      }
+                    }
+                    await AsyncStorage.setItem('lastSeenServerAlertId', String(latestCritical.id));
+                  }
+                }
+              }
+            } else {
+              console.warn('Falha ao consultar /alerts:', res.status);
+            }
+          } catch (e) {
+            console.warn('Erro de rede ao consultar /alerts:', e);
+          }
+        })();
         // Ao conectar, solicita um broadcast de status para reduzir a janela de offline
         setTimeout(() => {
           if (ws.current?.ws?.readyState === WebSocket.OPEN) {
@@ -401,6 +474,28 @@ export const AlertsProvider: React.FC<AlertsProviderProps> = ({
         });
 
         setDevicesById(initial);
+
+        // Reidrata visual do alerta se houver algum dispositivo com lastAlertType
+        const firstWithAlert = Object.values(initial).find(d => d.lastAlertType);
+        if (firstWithAlert?.lastAlertType === "PANICO") {
+          setActiveAlert({
+            title: "🚨 ALERTA DE PÂNICO!",
+            message: `Botão de pânico acionado pelo dispositivo '${firstWithAlert.deviceId}'.`,
+            type: "PANICO",
+          });
+          setWristbandPanicActive(true);
+        } else if (firstWithAlert?.lastAlertType === "QUEDA") {
+          setActiveAlert({
+            title: "⚠️ ALERTA DE QUEDA!",
+            message: `Queda detectada pelo dispositivo '${firstWithAlert.deviceId}'.`,
+            type: "QUEDA",
+          });
+          setFallState({
+            status: "Queda Detectada",
+            comodo: "indefinido",
+            dispositivo: firstWithAlert.deviceId,
+          });
+        }
       } catch (error) {
         console.error("Erro ao carregar dados iniciais:", error);
       }
@@ -597,7 +692,61 @@ export const AlertsProvider: React.FC<AlertsProviderProps> = ({
   };
 
   return (
-    <AlertsContext.Provider value={value}>{children}</AlertsContext.Provider>
+    <AlertsContext.Provider value={value}>
+      {children}
+      {activeAlert && (
+        <View style={styles.alertOverlay}>
+          <View style={styles.alertBox}>
+            <Text style={styles.alertTitle}>{activeAlert.title}</Text>
+            <Text style={styles.alertMessage}>{activeAlert.message}</Text>
+            <TouchableOpacity style={styles.alertButton} onPress={dismissActiveAlert}>
+              <Text style={styles.alertButtonText}>OK</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      )}
+    </AlertsContext.Provider>
   );
 };
+
+const styles = StyleSheet.create({
+  alertOverlay: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    bottom: 0,
+    padding: 16,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+  },
+  alertBox: {
+    backgroundColor: '#1f2937',
+    borderRadius: 12,
+    padding: 16,
+    borderWidth: 2,
+    borderColor: '#374151',
+  },
+  alertTitle: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#f9fafb',
+    marginBottom: 6,
+  },
+  alertMessage: {
+    fontSize: 14,
+    color: '#e5e7eb',
+    marginBottom: 12,
+  },
+  alertButton: {
+    alignSelf: 'flex-end',
+    backgroundColor: '#2563eb',
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 8,
+  },
+  alertButtonText: {
+    color: '#ffffff',
+    fontWeight: 'bold',
+    fontSize: 14,
+  },
+});
 

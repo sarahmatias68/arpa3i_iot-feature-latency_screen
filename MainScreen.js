@@ -13,6 +13,8 @@ export default function MainScreen({ navigation, user }) {
     getDevicesByType,
     getNewDevices,
     acknowledgeAlert,
+    activeAlert,
+    dismissActiveAlert,
   } = useAlerts();
 
   const [typeSelectorVisible, setTypeSelectorVisible] = useState(false);
@@ -213,6 +215,18 @@ export default function MainScreen({ navigation, user }) {
 
       </ScrollView>
 
+      {activeAlert && (
+        <View style={styles.alertOverlay}>
+          <View style={styles.alertBox}>
+            <Text style={styles.alertTitle}>{activeAlert.title}</Text>
+            <Text style={styles.alertMessage}>{activeAlert.message}</Text>
+            <TouchableOpacity style={styles.alertButton} onPress={dismissActiveAlert}>
+              <Text style={styles.alertButtonText}>OK</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      )}
+
       <DeviceTypeSelector
         visible={typeSelectorVisible}
         onClose={() => setTypeSelectorVisible(false)}
@@ -395,5 +409,44 @@ const styles = StyleSheet.create({
     marginTop: 8,
     fontSize: 12,
     fontWeight: 'bold',
+  },
+  // Overlay/Modal simples para activeAlert
+  alertOverlay: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    bottom: 0,
+    padding: 16,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+  },
+  alertBox: {
+    backgroundColor: '#1f2937',
+    borderRadius: 12,
+    padding: 16,
+    borderWidth: 2,
+    borderColor: '#374151',
+  },
+  alertTitle: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#f9fafb',
+    marginBottom: 6,
+  },
+  alertMessage: {
+    fontSize: 14,
+    color: '#e5e7eb',
+    marginBottom: 12,
+  },
+  alertButton: {
+    alignSelf: 'flex-end',
+    backgroundColor: '#2563eb',
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 8,
+  },
+  alertButtonText: {
+    color: '#ffffff',
+    fontWeight: 'bold',
+    fontSize: 14,
   },
 });
