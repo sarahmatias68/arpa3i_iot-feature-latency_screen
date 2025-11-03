@@ -1,11 +1,12 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useMemo } from 'react';
 import { View, Text, StyleSheet, FlatList, TouchableOpacity, Alert, ActivityIndicator, Modal, TextInput, SafeAreaView, KeyboardAvoidingView, Platform } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
+import { getTheme, typography } from './theme';
 
-const API_URL = 'http://192.168.2.115:86';
+const API_URL = 'http://192.168.1.7:86';
 
-const UserListScreen = () => {
+const UserListScreen = ({ themeName = 'dark' }) => {
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [modalVisible, setModalVisible] = useState(false);
@@ -13,6 +14,8 @@ const UserListScreen = () => {
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const theme = useMemo(() => getTheme(themeName), [themeName]);
+  const styles = useMemo(() => createStyles(theme), [theme]);
 
   const fetchUsers = useCallback(async () => {
     setLoading(true);
@@ -103,7 +106,7 @@ const UserListScreen = () => {
   };
 
   if (loading) {
-    return <ActivityIndicator size="large" color="#3b82f6" style={styles.loader} />;
+    return <ActivityIndicator size="large" color={theme.colors.primary} style={styles.loader} />;
   }
 
   return (
@@ -118,9 +121,9 @@ const UserListScreen = () => {
               <Text style={styles.userEmail}>{item.email}</Text>
             </View>
             <View style={styles.userActions}>
-              <TouchableOpacity onPress={() => openModalToEdit(item)}><Ionicons name="pencil" size={24} color="#3b82f6" /></TouchableOpacity>
+              <TouchableOpacity onPress={() => openModalToEdit(item)}><Ionicons name="pencil" size={24} color={theme.colors.primary} /></TouchableOpacity>
               <TouchableOpacity onPress={() => handleDelete(item)} style={{ marginLeft: 20 }} disabled={item.id === 1}>
-                <Ionicons name="trash-bin" size={24} color={item.id === 1 ? '#4b5563' : '#ef4444'} />
+                <Ionicons name="trash-bin" size={24} color={item.id === 1 ? theme.colors.muted : theme.colors.danger} />
               </TouchableOpacity>
             </View>
           </View>
@@ -129,7 +132,7 @@ const UserListScreen = () => {
       />
 
       <TouchableOpacity style={styles.fab} onPress={openModalToAdd}>
-        <Ionicons name="add" size={30} color="#f9fafb" />
+        <Ionicons name="add" size={30} color={theme.colors.text} />
       </TouchableOpacity>
 
       <Modal animationType="slide" transparent={true} visible={modalVisible} onRequestClose={() => setModalVisible(false)}>
@@ -137,9 +140,9 @@ const UserListScreen = () => {
           <View style={styles.modalContent}>
             <Text style={styles.modalTitle}>{currentUser ? 'Editar Usuário' : 'Adicionar Usuário'}</Text>
             
-            <TextInput style={styles.input} placeholder="Nome" value={name} onChangeText={setName} placeholderTextColor="#6b7280" />
-            <TextInput style={styles.input} placeholder="E-mail" value={email} onChangeText={setEmail} keyboardType="email-address" autoCapitalize="none" placeholderTextColor="#6b7280" />
-            <TextInput style={styles.input} placeholder={currentUser ? 'Nova Senha (opcional)' : 'Senha'} value={password} onChangeText={setPassword} secureTextEntry placeholderTextColor="#6b7280" />
+            <TextInput style={styles.input} placeholder="Nome" value={name} onChangeText={setName} placeholderTextColor={theme.colors.muted} />
+            <TextInput style={styles.input} placeholder="E-mail" value={email} onChangeText={setEmail} keyboardType="email-address" autoCapitalize="none" placeholderTextColor={theme.colors.muted} />
+            <TextInput style={styles.input} placeholder={currentUser ? 'Nova Senha (opcional)' : 'Senha'} value={password} onChangeText={setPassword} secureTextEntry placeholderTextColor={theme.colors.muted} />
             
             <View style={styles.modalActions}>
               <TouchableOpacity style={[styles.button, styles.cancelButton]} onPress={() => setModalVisible(false)}><Text style={styles.buttonText}>Cancelar</Text></TouchableOpacity>
@@ -152,26 +155,26 @@ const UserListScreen = () => {
   );
 };
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#0b1220' },
-  loader: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#111827' },
-  userItem: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 20, borderBottomWidth: 1, borderBottomColor: '#374151', backgroundColor: '#1f2937' },
+const createStyles = (theme) => StyleSheet.create({
+  container: { flex: 1, backgroundColor: theme.colors.background },
+  loader: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: theme.colors.background },
+  userItem: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 20, borderBottomWidth: 1, borderBottomColor: theme.colors.border, backgroundColor: theme.colors.card },
   userInfo: { flex: 1 },
-  userName: { color: '#f9fafb', fontSize: 18, fontWeight: 'bold' },
-  userEmail: { color: '#d1d5db', fontSize: 14 },
+  userName: { ...typography.h3, color: theme.colors.text },
+  userEmail: { ...typography.small, color: theme.colors.muted },
   userActions: { flexDirection: 'row' },
-  emptyText: { textAlign: 'center', color: '#9ca3af', marginTop: 50, fontSize: 16 },
-  fab: { position: 'absolute', right: 30, bottom: 30, width: 60, height: 60, borderRadius: 30, backgroundColor: '#2563eb', justifyContent: 'center', alignItems: 'center', elevation: 8 },
+  emptyText: { textAlign: 'center', color: theme.colors.muted, marginTop: 50, ...typography.body },
+  fab: { position: 'absolute', right: 30, bottom: 30, width: 60, height: 60, borderRadius: 30, backgroundColor: theme.colors.primary, justifyContent: 'center', alignItems: 'center', elevation: 8 },
   // Modal Styles
   modalContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: 'rgba(0,0,0,0.6)' },
-  modalContent: { width: '90%', backgroundColor: '#1f2937', borderRadius: 10, padding: 20, elevation: 10 },
-  modalTitle: { fontSize: 22, fontWeight: 'bold', color: '#f9fafb', marginBottom: 20, textAlign: 'center' },
-  input: { backgroundColor: '#374151', color: '#f9fafb', padding: 12, borderRadius: 8, fontSize: 16, marginBottom: 15 },
+  modalContent: { width: '90%', backgroundColor: theme.colors.card, borderRadius: 10, padding: 20, elevation: 10, borderWidth: 1, borderColor: theme.colors.border },
+  modalTitle: { ...typography.h2, color: theme.colors.text, marginBottom: 20, textAlign: 'center' },
+  input: { backgroundColor: theme.colors.card, color: theme.colors.text, padding: 12, borderRadius: 8, fontSize: 16, marginBottom: 15, borderWidth: 1, borderColor: theme.colors.border },
   modalActions: { flexDirection: 'row', justifyContent: 'space-between', marginTop: 10 },
   button: { flex: 1, padding: 12, borderRadius: 8, alignItems: 'center' },
-  cancelButton: { backgroundColor: '#4b5563', marginRight: 10 },
-  saveButton: { backgroundColor: '#2563eb', marginLeft: 10 },
-  buttonText: { color: '#f9fafb', fontSize: 16, fontWeight: 'bold' },
+  cancelButton: { backgroundColor: theme.colors.border, marginRight: 10 },
+  saveButton: { backgroundColor: theme.colors.primary, marginLeft: 10 },
+  buttonText: { color: theme.colors.text, fontSize: 16, fontWeight: 'bold' },
 });
 
 export default UserListScreen;

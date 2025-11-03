@@ -1,7 +1,11 @@
+import { useMemo } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Linking, Alert } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { getTheme, typography } from './theme';
 
-const AboutScreen = () => {
+const AboutScreen = ({ themeName = 'dark' }) => {
+  const theme = useMemo(() => getTheme(themeName), [themeName]);
+  const styles = useMemo(() => createStyles(theme), [theme]);
   const openURL = async (url) => {
     const supported = await Linking.canOpenURL(url);
     if (supported) {
@@ -12,7 +16,7 @@ const AboutScreen = () => {
   };
   return (
     <View style={styles.container}>
-      <Ionicons name="shield-checkmark-outline" size={80} color="#10b981" />
+      <Ionicons name="shield-checkmark-outline" size={80} color={theme.colors.success} />
       <Text style={styles.title}>ARPA3I - Sistema de Monitoramento</Text>
       <Text style={styles.text}>Versão 1.0.0</Text>
       <Text style={styles.text}> ARPA3I é um sistema de automação composto por um botão de pânico incorporado a uma pulseira, sensores de gás e fumaça, e um aplicativo mobile para receber alertas dos dispositivos 
@@ -27,7 +31,7 @@ const AboutScreen = () => {
             <Ionicons name="logo-linkedin" size={40} color="#0e76a8" />
           </TouchableOpacity>
           <TouchableOpacity onPress={() => openURL('https://github.com/sarahmatias68')}>
-            <Ionicons name="logo-github" size={40} color="#f9fafb" />
+            <Ionicons name="logo-github" size={40} color={theme.colors.text} />
           </TouchableOpacity>
         </View>
       </View>
@@ -35,24 +39,24 @@ const AboutScreen = () => {
   );
 };
 
-const styles = StyleSheet.create({
+const createStyles = (theme) => StyleSheet.create({
   devContainer: {
     marginTop: 30,
     paddingTop: 20,
     borderTopWidth: 1,
-    borderTopColor: '#374151',
+    borderTopColor: theme.colors.border,
     alignItems: 'center',
     width: '100%',
   },
   devTitle: {
-    fontSize: 16,
-    color: '#9ca3af',
+    ...typography.small,
+    color: theme.colors.muted,
   },
   devName: {
-    fontSize: 22,
-    fontWeight: 'bold',
-    color: '#f9fafb',
+    ...typography.h2,
+    color: theme.colors.text,
     marginVertical: 8,
+    textAlign: 'center',
   },
   linksContainer: {
     flexDirection: 'row',
@@ -60,10 +64,10 @@ const styles = StyleSheet.create({
     gap: 30,
     marginTop: 10,
   },
-  container: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#0b1220', padding: 20 },
-  title: { color: '#f9fafb', fontSize: 22, fontWeight: 'bold', textAlign: 'center', marginTop: 20, marginBottom: 10 },
-  text: { color: '#d1d5db', fontSize: 16, textAlign: 'center', marginBottom: 15 },
-  footer: { position: 'absolute', bottom: 30, color: '#f3f4f6', fontSize: 12 },
+  container: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: theme.colors.background, padding: 20 },
+  title: { ...typography.h2, color: theme.colors.text, textAlign: 'center', marginTop: 20, marginBottom: 10 },
+  text: { ...typography.body, color: theme.colors.textSecondary, textAlign: 'center', marginBottom: 15 },
+  footer: { position: 'absolute', bottom: 30, color: theme.colors.muted, fontSize: 12 },
 });
 
 export default AboutScreen;

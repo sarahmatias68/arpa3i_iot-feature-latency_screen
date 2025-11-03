@@ -14,6 +14,7 @@ import { AlertsProvider } from "./AlertsContext";
 // IMPORTAÇÃO MODIFICADA
 import { registerForFcmAndSendToBackend } from "./notificationService";
 import NotificationHandler from "./NotificationHandler";
+import { getTheme } from "./theme";
 
 // --- IMPORTAÇÕES ADICIONADAS E MODIFICADAS (API MODULAR) ---
 import messaging from "@react-native-firebase/messaging";
@@ -46,7 +47,7 @@ export default function App() {
   // --- ADICIONADO ---
   // Ref para navegar ao clicar na notificação
   const navigationRef = useNavigationContainerRef();
-  const SERVER_HTTP_BASE = "http://192.168.2.115:86";
+  const SERVER_HTTP_BASE = "http://192.168.1.7:86";
 
   // --- USE EFFECT: auto-login (persistência de sessão) ---
   useEffect(() => {
@@ -157,18 +158,35 @@ export default function App() {
     })();
   }, [user, navigationRef]);
 
-  const AmoledTheme = {
-    ...NavDarkTheme,
+  const theme = getTheme(themeName);
+  const baseNavTheme = themeName === 'light' ? NavLightTheme : NavDarkTheme;
+  const navTheme = {
+    ...baseNavTheme,
     colors: {
-      ...NavDarkTheme.colors,
-      background: '#000000',
-      card: '#000000',
-      border: '#111111',
-      text: '#ffffff',
+      ...baseNavTheme.colors,
+      background: theme.colors.background,
+      card: theme.colors.card,
+      border: theme.colors.border,
+      text: theme.colors.text,
+      primary: theme.colors.primary,
     },
   };
 
-  const navTheme = themeName === 'light' ? NavLightTheme : (themeName === 'amoled' ? AmoledTheme : NavDarkTheme);
+  const getHeaderOptions = () => ({
+    headerShown: true,
+    headerStyle: {
+      backgroundColor: theme.colors.card,
+      elevation: 0,
+      shadowOpacity: 0,
+      borderBottomWidth: 1,
+      borderBottomColor: theme.colors.border,
+    },
+    headerTintColor: theme.colors.text,
+    headerTitleStyle: {
+      fontWeight: "bold",
+      color: theme.colors.text,
+    },
+  });
 
   return (
     // REF ADICIONADA AO CONTAINER
@@ -182,121 +200,148 @@ export default function App() {
               <Stack.Screen
                 name="Main"
                 options={({ navigation }) => ({
-                  headerShown: true,
+                  ...getHeaderOptions(),
                   title: "Painel de Controle",
-                  headerStyle: { backgroundColor: "#1f2937" },
-                  headerTintColor: "#f9fafb",
-                  headerTitleStyle: { fontWeight: "bold" },
                   headerRight: () => (
                     <TouchableOpacity
                       onPress={() => navigation.navigate("Settings")}
                       style={{ marginRight: 15 }}
+                      hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
                     >
                       <Ionicons
                         name="settings-outline"
                         size={24}
-                        color="#f9fafb"
+                        color={theme.colors.text}
                       />
                     </TouchableOpacity>
                   ),
                 })}
               >
-                {(props) => <MainScreen {...props} user={user} />}
+                {(props) => (
+                  <MainScreen
+                    {...props}
+                    user={user}
+                    themeName={themeName}
+                  />
+                )}
               </Stack.Screen>
               <Stack.Screen
                 name="CategoryDevices"
-                component={CategoryDevicesScreen}
                 options={({ route }) => ({
-                  headerShown: true,
+                  ...getHeaderOptions(),
                   title: route.params?.categoryTitle || "Dispositivos",
-                  headerStyle: { backgroundColor: "#1f2937" },
-                  headerTintColor: "#f9fafb",
-                  headerTitleStyle: { fontWeight: "bold" },
                 })}
-              />
+              >
+                {(props) => (
+                  <CategoryDevicesScreen
+                    {...props}
+                    themeName={themeName}
+                  />
+                )}
+              </Stack.Screen>
               <Stack.Screen
-                name="History" // Este é o nome que usamos no listener
-                component={LogsScreen}
-                options={{ headerShown: true, title: "Histórico de Registros" }}
-              />
+                name="History"
+                options={{
+                  ...getHeaderOptions(),
+                  title: "Histórico de Registros",
+                }}
+              >
+                {(props) => <LogsScreen {...props} themeName={themeName} />}
+              </Stack.Screen>
               <Stack.Screen
                 name="Settings"
                 options={{
+                  ...getHeaderOptions(),
                   title: "Configurações",
-                  headerShown: true,
-                  headerStyle: { backgroundColor: "#1f2937" },
-                  headerTintColor: "#f9fafb",
-                  headerTitleStyle: { fontWeight: "bold" },
                 }}
               >
                 {(props) => (
                   <SettingsScreen
                     {...props}
-                    onLogout={handleLogout}
                     themeName={themeName}
+                    onLogout={handleLogout}
                     onChangeTheme={async (name) => {
                       setThemeName(name);
-                      try { await AsyncStorage.setItem('app_theme', name); } catch {}
+                      try {
+                        await AsyncStorage.setItem('app_theme', name);
+                      } catch (e) {
+                        console.warn('Falha ao salvar tema', e);
+                      }
                     }}
                   />
                 )}
               </Stack.Screen>
               <Stack.Screen
                 name="DeviceRegistry"
-                component={DeviceRegistryScreen}
                 options={{
-                  headerShown: true,
-                  title: "Dispositivos",
-                  headerStyle: { backgroundColor: "#1f2937" },
-                  headerTintColor: "#f9fafb",
-                  headerTitleStyle: { fontWeight: "bold" },
+                  ...getHeaderOptions(),
+                  title: "Registro de Dispositivos",
                 }}
-              />
+              >
+                {(props) => (
+                  <DeviceRegistryScreen
+                    {...props}
+                    themeName={themeName}
+                  />
+                )}
+              </Stack.Screen>
               <Stack.Screen
                 name="UserData"
                 options={{
-                  headerShown: true,
+                  ...getHeaderOptions(),
                   title: "Meus Dados",
-                  headerStyle: { backgroundColor: "#1f2937" },
-                  headerTintColor: "#f9fafb",
-                  headerTitleStyle: { fontWeight: "bold" },
                 }}
               >
-                {(props) => <UserDataScreen {...props} user={user} />}
+                {(props) => (
+                  <UserDataScreen
+                    {...props}
+                    user={user}
+                    themeName={themeName}
+                  />
+                )}
               </Stack.Screen>
               <Stack.Screen
                 name="ElderlyData"
-                component={ElderlyDataScreen}
                 options={{
-                  headerShown: true,
+                  ...getHeaderOptions(),
                   title: "Dados do Idoso",
-                  headerStyle: { backgroundColor: "#1f2937" },
-                  headerTintColor: "#f9fafb",
-                  headerTitleStyle: { fontWeight: "bold" },
                 }}
-              />
+              >
+                {(props) => (
+                  <ElderlyDataScreen
+                    {...props}
+                    themeName={themeName}
+                  />
+                )}
+              </Stack.Screen>
               <Stack.Screen
                 name="UserList"
-                component={UserListScreen}
                 options={{
-                  headerShown: true,
+                  ...getHeaderOptions(),
                   title: "Gerenciar Usuários",
-                  headerStyle: { backgroundColor: "#1f2937" },
-                  headerTintColor: "#f9fafb",
-                  headerTitleStyle: { fontWeight: "bold" },
                 }}
-              />
+              >
+                {(props) => (
+                  <UserListScreen
+                    {...props}
+                    themeName={themeName}
+                  />
+                )}
+              </Stack.Screen>
               <Stack.Screen
                 name="About"
-                component={AboutScreen}
                 options={{
-                  headerShown: true,
+                  ...getHeaderOptions(),
                   title: "Sobre o Aplicativo",
-                  headerStyle: { backgroundColor: "#1f2937" },
-                  headerTintColor: "#f9fafb",
-                  headerTitleStyle: { fontWeight: "bold" },
                 }}
-              />
+              >
+                {(props) => (
+                  <AboutScreen
+                    {...props}
+                    themeName={themeName}
+                  />
+                )}
+              </Stack.Screen>
             </>
           ) : (
             // Grupo de Telas de Autenticação

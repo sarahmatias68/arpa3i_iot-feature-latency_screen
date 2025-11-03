@@ -1,10 +1,11 @@
 import React, { useMemo, useState } from 'react';
-import { View, Text, TextInput, TouchableOpacity, FlatList, StyleSheet, Alert } from 'react-native';
+import { View, Text, TouchableOpacity, FlatList, StyleSheet, Alert } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useAlerts } from './AlertsContext';
 import DeviceTypeSelector from './DeviceTypeSelector';
+import { getTheme, typography } from './theme';
 
-const DeviceRegistryScreen = () => {
+const DeviceRegistryScreen = ({ navigation, themeName = 'dark' }) => {
   const {
     devicesById,
     deviceTypes,
@@ -15,7 +16,8 @@ const DeviceRegistryScreen = () => {
 
   const [selectorVisible, setSelectorVisible] = useState(false);
   const [selectedDeviceId, setSelectedDeviceId] = useState(null);
-  const [newDeviceId, setNewDeviceId] = useState('');
+  const theme = useMemo(() => getTheme(themeName), [themeName]);
+  const styles = useMemo(() => createStyles(theme), [theme]);
 
   const devices = useMemo(() => Object.values(devicesById).sort((a, b) => a.deviceId.localeCompare(b.deviceId)), [devicesById]);
 
@@ -29,70 +31,66 @@ const DeviceRegistryScreen = () => {
       await updateDeviceType(selectedDeviceId, typeId);
       setSelectedDeviceId(null);
       setSelectorVisible(false);
-      setNewDeviceId('');
     }
-  };
-
-  const handleAddDevice = async () => {
-    const id = newDeviceId.trim();
-    if (!id) return;
-    setSelectedDeviceId(id);
-    setSelectorVisible(true);
   };
 
   const handleClearType = async (deviceId) => {
     await updateDeviceType(deviceId, undefined);
   };
 
+  const navigateToDevice = (deviceId) => {
+    navigation.navigate('CategoryDevices', {
+      categoryTitle: 'Dispositivo',
+      categoryIcon: '📟',
+      categoryKey: 'detector',
+      focusDeviceId: deviceId,
+    });
+  };
+
   const renderItem = ({ item }) => (
-    <View style={styles.itemRow}>
-      <View style={{ flex: 1 }}>
-        <Text style={styles.deviceId}>{item.deviceId}</Text>
+    <TouchableOpacity
+      style={styles.itemRow}
+      onPress={() => navigateToDevice(item.deviceId)}
+      activeOpacity={0.9}
+    >
+      <View style={styles.itemBody}>
+        <View style={styles.itemHeader}>
+          <Text style={styles.deviceId}>{item.deviceId}</Text>
+          <TouchableOpacity
+            style={[styles.iconButton, !item.connected && styles.iconButtonDanger]}
+            onPress={() => {
+              if (item.connected) {
+                Alert.alert('Não permitido', 'Só é possível excluir dispositivos offline.');
+                return;
+              }
+              Alert.alert('Excluir dispositivo', `Deseja remover '${item.deviceId}' da lista?`, [
+                { text: 'Cancelar', style: 'cancel' },
+                { text: 'Excluir', style: 'destructive', onPress: () => removeDevice(item.deviceId) },
+              ]);
+            }}
+            hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
+          >
+            <Ionicons name="trash-outline" size={20} color={item.connected ? theme.colors.muted : theme.colors.danger} />
+          </TouchableOpacity>
+        </View>
         <Text style={styles.meta}>
-          Status: <Text style={{ color: item.connected ? '#10b981' : '#ef4444' }}>{item.connected ? 'online' : 'offline'}</Text>
+          Status: <Text style={{ color: item.connected ? theme.colors.success : theme.colors.danger }}>{item.connected ? 'online' : 'offline'}</Text>
           {item.deviceType ? `  •  Tipo: ${item.deviceType}` : '  •  Tipo: não definido'}
         </Text>
       </View>
-      <TouchableOpacity style={styles.smallButton} onPress={() => openSelector(item.deviceId)}>
-        <Text style={styles.smallButtonText}>Definir Tipo</Text>
-      </TouchableOpacity>
-      <TouchableOpacity style={[styles.smallButton, { backgroundColor: '#ef4444' }]} onPress={() => handleClearType(item.deviceId)}>
-        <Text style={styles.smallButtonText}>Limpar Tipo</Text>
-      </TouchableOpacity>
-      <TouchableOpacity
-        style={[styles.iconButton, !item.connected && styles.iconButtonDanger]}
-        onPress={() => {
-          if (item.connected) {
-            Alert.alert('Não permitido', 'Só é possível excluir dispositivos offline.');
-            return;
-          }
-          Alert.alert('Excluir dispositivo', `Deseja remover '${item.deviceId}' da lista?`, [
-            { text: 'Cancelar', style: 'cancel' },
-            { text: 'Excluir', style: 'destructive', onPress: () => removeDevice(item.deviceId) },
-          ]);
-        }}
-      >
-        <Ionicons name="trash-outline" size={20} color={item.connected ? '#6b7280' : '#ef4444'} />
-      </TouchableOpacity>
-    </View>
+      <View style={styles.actionsColumn}>
+        <TouchableOpacity style={styles.fullButton} onPress={() => openSelector(item.deviceId)}>
+          <Text style={styles.fullButtonText}>Definir Tipo</Text>
+        </TouchableOpacity>
+        <TouchableOpacity style={[styles.fullButton, styles.fullButtonSecondary]} onPress={() => handleClearType(item.deviceId)}>
+          <Text style={[styles.fullButtonText, styles.fullButtonSecondaryText]}>Limpar Tipo</Text>
+        </TouchableOpacity>
+      </View>
+    </TouchableOpacity>
   );
 
   return (
     <View style={styles.container}>
-      <View style={styles.actionsRow}>
-        <TextInput
-          placeholder="ID do dispositivo"
-          placeholderTextColor="#9ca3af"
-          value={newDeviceId}
-          onChangeText={setNewDeviceId}
-          style={styles.input}
-          autoCapitalize="none"
-        />
-        <TouchableOpacity style={styles.addButton} onPress={handleAddDevice}>
-          <Text style={styles.addButtonText}>Adicionar</Text>
-        </TouchableOpacity>
-      </View>
-
       <TouchableOpacity style={styles.broadcastButton} onPress={requestSystemBroadcast}>
         <Text style={styles.broadcastButtonText}>Solicitar status dos dispositivos</Text>
       </TouchableOpacity>
@@ -116,30 +114,22 @@ const DeviceRegistryScreen = () => {
   );
 };
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#111827', padding: 16 },
-  actionsRow: { flexDirection: 'row', gap: 8, marginBottom: 12 },
-  input: {
-    flex: 1,
-    backgroundColor: '#1f2937',
-    color: '#f9fafb',
-    borderRadius: 8,
-    paddingHorizontal: 12,
-    height: 44,
-    borderWidth: 1,
-    borderColor: '#374151',
-  },
-  addButton: { backgroundColor: '#3b82f6', paddingHorizontal: 16, borderRadius: 8, justifyContent: 'center' },
-  addButtonText: { color: '#ffffff', fontWeight: '600' },
-  broadcastButton: { backgroundColor: '#10b981', padding: 12, borderRadius: 8, marginBottom: 12, alignItems: 'center' },
-  broadcastButtonText: { color: '#06251c', fontWeight: '700' },
-  itemRow: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#1f2937', padding: 12, borderRadius: 10, borderWidth: 1, borderColor: '#374151' },
-  deviceId: { color: '#f9fafb', fontWeight: '700', marginBottom: 4 },
-  meta: { color: '#9ca3af' },
-  smallButton: { backgroundColor: '#374151', paddingVertical: 8, paddingHorizontal: 12, borderRadius: 8, marginLeft: 8 },
-  smallButtonText: { color: '#f9fafb', fontWeight: '600' },
-  iconButton: { marginLeft: 8, padding: 8, borderRadius: 8, backgroundColor: '#1f2937', borderWidth: 1, borderColor: '#374151' },
-  iconButtonDanger: { backgroundColor: '#111827' },
+const createStyles = (theme) => StyleSheet.create({
+  container: { flex: 1, backgroundColor: theme.colors.background, padding: 16 },
+  broadcastButton: { backgroundColor: theme.colors.success, padding: 12, borderRadius: 8, marginBottom: 12, alignItems: 'center' },
+  broadcastButtonText: { color: theme.name === 'light' ? theme.colors.text : '#06251c', fontWeight: '700' },
+  itemRow: { flexDirection: 'row', alignItems: 'stretch', backgroundColor: theme.colors.card, padding: 12, borderRadius: 12, borderWidth: 1, borderColor: theme.colors.border, gap: 12 },
+  itemBody: { flex: 1 },
+  itemHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' },
+  deviceId: { color: theme.colors.text, marginBottom: 4, ...typography.bodyStrong },
+  meta: { color: theme.colors.muted, ...typography.small },
+  actionsColumn: { justifyContent: 'space-between', gap: 8 },
+  fullButton: { backgroundColor: theme.colors.primary, paddingVertical: 8, paddingHorizontal: 16, borderRadius: 8, alignItems: 'center' },
+  fullButtonSecondary: { backgroundColor: theme.colors.border },
+  fullButtonText: { color: theme.name === 'light' ? '#ffffff' : theme.colors.text, fontWeight: '600' },
+  fullButtonSecondaryText: { color: theme.colors.text },
+  iconButton: { padding: 8, borderRadius: 8, backgroundColor: theme.colors.card, borderWidth: 1, borderColor: theme.colors.border },
+  iconButtonDanger: { backgroundColor: theme.colors.background },
 });
 
 export default DeviceRegistryScreen;

@@ -1,7 +1,11 @@
 import { View, Text, StyleSheet, TouchableOpacity, ScrollView } from 'react-native';
+import { useMemo } from 'react';
 import { Ionicons } from '@expo/vector-icons';
+import { getTheme, typography } from './theme';
 
 const SettingsScreen = ({ navigation, onLogout, themeName = 'dark', onChangeTheme }) => {
+  const theme = useMemo(() => getTheme(themeName), [themeName]);
+  const styles = useMemo(() => createStyles(theme), [theme]);
   const menuItems = [
     { title: 'Dados do Usuário', screen: 'UserData', icon: 'person-circle-outline' },
     { title: 'Dados do Idoso', screen: 'ElderlyData', icon: 'body-outline' },
@@ -18,51 +22,42 @@ const SettingsScreen = ({ navigation, onLogout, themeName = 'dark', onChangeThem
           style={[styles.themeButton, themeName === 'light' && styles.themeButtonActive]}
           onPress={() => onChangeTheme && onChangeTheme('light')}
         >
-          <Ionicons name="sunny-outline" size={18} color="#f9fafb" style={{ marginRight: 6 }} />
+          <Ionicons name="sunny-outline" size={18} color={themeName === 'light' ? theme.colors.text : theme.colors.textSecondary} style={{ marginRight: 6 }} />
           <Text style={styles.themeButtonText}>Claro</Text>
         </TouchableOpacity>
         <TouchableOpacity
           style={[styles.themeButton, themeName === 'dark' && styles.themeButtonActive]}
           onPress={() => onChangeTheme && onChangeTheme('dark')}
         >
-          <Ionicons name="moon-outline" size={18} color="#f9fafb" style={{ marginRight: 6 }} />
+          <Ionicons name="moon-outline" size={18} color={themeName === 'dark' ? theme.colors.text : theme.colors.textSecondary} style={{ marginRight: 6 }} />
           <Text style={styles.themeButtonText}>Escuro</Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={[styles.themeButton, themeName === 'amoled' && styles.themeButtonActive]}
-          onPress={() => onChangeTheme && onChangeTheme('amoled')}
-        >
-          <Ionicons name="contrast-outline" size={18} color="#f9fafb" style={{ marginRight: 6 }} />
-          <Text style={styles.themeButtonText}>AMOLED</Text>
         </TouchableOpacity>
       </View>
 
       <Text style={styles.sectionTitle}>Configurações</Text>
       {menuItems.map((item, index) => (
         <TouchableOpacity key={index} style={styles.menuItem} onPress={() => navigation.navigate(item.screen)}>
-          <Ionicons name={item.icon} size={24} color="#3b82f6" style={styles.icon} />
+          <Ionicons name={item.icon} size={24} color={theme.colors.primary} style={styles.icon} />
           <Text style={styles.menuText}>{item.title}</Text>
-          <Ionicons name="chevron-forward-outline" size={24} color="#6b7280" />
+          <Ionicons name="chevron-forward-outline" size={24} color={theme.colors.muted} />
         </TouchableOpacity>
       ))}
       <TouchableOpacity style={styles.logoutButton} onPress={onLogout}>
-          <Ionicons name="log-out-outline" size={24} color="#ef4444" style={styles.icon} />
+          <Ionicons name="log-out-outline" size={24} color={theme.colors.danger} style={styles.icon} />
           <Text style={styles.logoutText}>Sair</Text>
       </TouchableOpacity>
     </ScrollView>
   );
 };
 
-const styles = StyleSheet.create({
+const createStyles = (theme) => StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#0b1220',
-    
+    backgroundColor: theme.colors.background,
   },
   sectionTitle: {
-    color: '#f9fafb',
-    fontSize: 14,
-    fontWeight: '600',
+    ...typography.smallStrong,
+    color: theme.colors.textSecondary,
     marginTop: 16,
     marginBottom: 8,
     paddingHorizontal: 15,
@@ -77,54 +72,53 @@ const styles = StyleSheet.create({
   themeButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#1f2937',
+    backgroundColor: theme.colors.card,
     borderWidth: 1,
-    borderColor: '#374151',
+    borderColor: theme.colors.border,
     borderRadius: 8,
     paddingHorizontal: 12,
     paddingVertical: 8,
   },
   themeButtonActive: {
-    borderColor: '#3b82f6',
+    borderColor: theme.colors.primary,
+    backgroundColor: theme.name === 'light' ? '#dbeafe' : '#1e3a8a',
   },
   themeButtonText: {
-    color: '#f9fafb',
-    fontSize: 14,
-    fontWeight: '600',
+    ...typography.smallStrong,
+    color: theme.colors.text,
   },
   menuItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#1f2937',
+    backgroundColor: theme.colors.card,
     paddingVertical: 20,
     paddingHorizontal: 15,
     borderBottomWidth: 1,
-    borderBottomColor: '#374151',
+    borderBottomColor: theme.colors.border,
   },
   icon: {
     marginRight: 15,
   },
   menuText: {
     flex: 1,
-    color: '#f9fafb',
-    fontSize: 18,
+    ...typography.h3,
+    color: theme.colors.text,
   },
   logoutButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#1f2937',
+    backgroundColor: theme.colors.card,
     paddingVertical: 20,
     paddingHorizontal: 15,
     marginTop: 20,
     borderTopWidth: 1,
     borderBottomWidth: 1,
-    borderColor: '#374151',
+    borderColor: theme.colors.border,
   },
   logoutText: {
     flex: 1,
-    color: '#ef4444',
-    fontSize: 18,
-    fontWeight: 'bold',
+    ...typography.h3,
+    color: theme.colors.danger,
   },
 });
 

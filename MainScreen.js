@@ -1,10 +1,11 @@
 import { View, Text, StyleSheet, StatusBar, TouchableOpacity, ScrollView } from 'react-native';
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useAlerts } from './AlertsContext';
 import { ConnectionStatusBanner } from './ConnectionStatusBanner';
 import DeviceTypeSelector from './DeviceTypeSelector';
+import { getTheme, typography } from './theme';
 
-export default function MainScreen({ navigation, user }) {
+export default function MainScreen({ navigation, user, themeName = 'dark' }) {
   const {
     connectionStatus,
     sensorState,
@@ -19,6 +20,8 @@ export default function MainScreen({ navigation, user }) {
 
   const [typeSelectorVisible, setTypeSelectorVisible] = useState(false);
   const [selectedDeviceId, setSelectedDeviceId] = useState(null);
+  const theme = useMemo(() => getTheme(themeName), [themeName]);
+  const styles = useMemo(() => createStyles(theme), [theme]);
 
   const getColorForSensorState = (state) => {
     switch (state) {
@@ -206,7 +209,7 @@ export default function MainScreen({ navigation, user }) {
   
   return (
     <View style={styles.container}>
-      <StatusBar barStyle="light-content" />
+      <StatusBar barStyle={themeName === 'light' ? 'dark-content' : 'light-content'} />
       <ConnectionStatusBanner status={connectionStatus} />
 
       <ScrollView 
@@ -262,7 +265,6 @@ export default function MainScreen({ navigation, user }) {
             return hasFall ? { text: 'Queda Detectada', bg: '#7f1d1d' } : { text: null, bg: null };
           })()
         )}
-
       </ScrollView>
 
       
@@ -278,10 +280,10 @@ export default function MainScreen({ navigation, user }) {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (theme) => StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#0b1220',
+    backgroundColor: theme.colors.background,
   },
   scrollView: {
     flex: 1,
@@ -294,22 +296,23 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   newDevicesSection: {
-    backgroundColor: '#1f2937',
+    backgroundColor: theme.colors.card,
     borderRadius: 12,
     padding: 20,
     width: '90%',
     maxWidth: 400,
     marginBottom: 20,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
   },
   newDevicesHeader: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#f9fafb',
+    ...typography.h3,
+    color: theme.colors.text,
     marginBottom: 5,
   },
   newDevicesSubtitle: {
-    fontSize: 13,
-    color: '#9ca3af',
+    ...typography.small,
+    color: theme.colors.muted,
     marginBottom: 10,
     fontStyle: 'italic',
   },
@@ -319,17 +322,19 @@ const styles = StyleSheet.create({
     marginBottom: 20,
   },
   categoryButton: {
-    backgroundColor: '#2d3748',
+    backgroundColor: theme.colors.card,
     borderRadius: 16,
     padding: 25,
     alignItems: 'center',
     justifyContent: 'center',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
+    shadowOpacity: theme.name === 'light' ? 0.15 : 0.3,
     shadowRadius: 8,
     elevation: 8,
     position: 'relative',
+    borderWidth: 1,
+    borderColor: theme.colors.border,
   },
   categoryContent: {
     alignItems: 'center',
@@ -339,28 +344,26 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   categoryTitle: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: '#ffffff',
+    ...typography.h3,
+    color: theme.colors.text,
     textAlign: 'center',
   },
   categoryStatus: {
-    fontSize: 14,
-    color: '#e5e7eb',
+    ...typography.smallStrong,
+    color: theme.colors.textSecondary,
     marginTop: 6,
     textAlign: 'center',
-    fontWeight: '600',
   },
   categoryCount: {
-    fontSize: 14,
-    color: '#9ca3af',
+    ...typography.small,
+    color: theme.colors.muted,
     marginTop: 4,
   },
   alertBadge: {
     position: 'absolute',
     top: 10,
     right: 10,
-    backgroundColor: '#ef4444',
+    backgroundColor: theme.colors.danger,
     borderRadius: 12,
     minWidth: 24,
     height: 24,
@@ -369,22 +372,25 @@ const styles = StyleSheet.create({
     paddingHorizontal: 6,
   },
   alertBadgeText: {
-    color: '#ffffff',
+    color: theme.colors.text,
     fontSize: 12,
     fontWeight: 'bold',
   },
   devicesContainer: {
     marginTop: 15,
-    backgroundColor: '#1f2937',
+    backgroundColor: theme.colors.card,
     borderRadius: 12,
     padding: 15,
   },
   deviceHeader: {
     flexDirection: 'row',
-    backgroundColor: '#0e76a8',
+    backgroundColor: theme.colors.card,
     justifyContent: 'space-between',
     alignItems: 'center',
     marginBottom: 8,
+    paddingBottom: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: theme.colors.border,
   },
   typeButtonsContainer: {
     flexDirection: 'row',
@@ -395,15 +401,16 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 6,
     borderRadius: 8,
+    backgroundColor: theme.colors.primary,
   },
   typeButtonText: {
-    color: '#ffffff',
+    color: theme.name === 'light' ? '#ffffff' : theme.colors.text,
     fontSize: 12,
     fontWeight: 'bold',
     textAlign: 'center',
   },
   removeButton: {
-    backgroundColor: '#ef4444',
+    backgroundColor: theme.colors.danger,
     paddingHorizontal: 12,
     paddingVertical: 6,
     borderRadius: 8,
@@ -417,78 +424,73 @@ const styles = StyleSheet.create({
     opacity: 0.5,
   },
   subCard: {
-    backgroundColor: '#111827',
+    backgroundColor: theme.colors.card,
     borderRadius: 10,
     padding: 16,
     marginTop: 10,
-    borderWidth: 2,
-    borderColor: '#374151',
+    borderWidth: 1,
+    borderColor: theme.colors.border,
   },
   subTitle: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: '#f3f4f6',
+    ...typography.h3,
+    color: theme.colors.text,
     flex: 1,
     marginRight: 8,
   },
   subStatus: {
     marginTop: 6,
-    fontSize: 14,
-    fontWeight: 'bold',
+    ...typography.smallStrong,
   },
   deviceInfoBlock: {
     marginTop: 12,
     gap: 5,
   },
   deviceInfoText: {
-    fontSize: 13,
-    color: '#d1d5db',
+    ...typography.small,
+    color: theme.colors.muted,
   },
   cardPanicActive: {
-    borderWidth: 3,
-    borderColor: '#ef4444',
-    backgroundColor: '#331111',
+    borderWidth: 2,
+    borderColor: theme.colors.danger,
+    backgroundColor: theme.name === 'light' ? '#fee2e2' : '#331111',
   },
   cardFallActive: {
-    borderWidth: 3,
-    borderColor: '#f59e0b',
-    backgroundColor: '#3b2f0a',
+    borderWidth: 2,
+    borderColor: theme.colors.warning,
+    backgroundColor: theme.name === 'light' ? '#fef3c7' : '#3b2f0a',
   },
   ackHint: {
     marginTop: 8,
-    fontSize: 12,
-    fontWeight: 'bold',
+    ...typography.smallStrong,
   },
-  // Overlay/Modal simples para activeAlert
   alertOverlay: {
     position: 'absolute',
     left: 0,
     right: 0,
     bottom: 0,
     padding: 16,
-    backgroundColor: 'rgba(0,0,0,0.5)',
+    backgroundColor: theme.colors.overlay,
   },
   alertBox: {
-    backgroundColor: '#1f2937',
+    backgroundColor: theme.colors.card,
     borderRadius: 12,
     padding: 16,
-    borderWidth: 2,
-    borderColor: '#374151',
+    borderWidth: 1,
+    borderColor: theme.colors.border,
   },
   alertTitle: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: '#f9fafb',
+    ...typography.h3,
+    color: theme.colors.text,
     marginBottom: 6,
   },
   alertMessage: {
-    fontSize: 14,
-    color: '#e5e7eb',
+    ...typography.body,
+    color: theme.colors.textSecondary,
     marginBottom: 12,
   },
   alertButton: {
     alignSelf: 'flex-end',
-    backgroundColor: '#2563eb',
+    backgroundColor: theme.colors.primary,
     paddingHorizontal: 16,
     paddingVertical: 8,
     borderRadius: 8,

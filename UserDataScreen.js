@@ -1,13 +1,16 @@
-import React, { useState, useEffect } from 'react';
+import React, { useMemo, useState, useEffect } from 'react';
 import { View, Text, TextInput, StyleSheet, TouchableOpacity, Alert, ScrollView, KeyboardAvoidingView, Platform } from 'react-native';
+import { getTheme, typography } from './theme';
 
-const API_URL = 'http://192.168.2.115:86';
+const API_URL = 'http://192.168.1.7:86';
 
-const UserDataScreen = ({ user }) => {
+const UserDataScreen = ({ user, themeName = 'dark' }) => {
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
+  const theme = useMemo(() => getTheme(themeName), [themeName]);
+  const styles = useMemo(() => createStyles(theme), [theme]);
 
   useEffect(() => {
     console.log('Dados do usuário recebidos na tela Meus Dados:', JSON.stringify(user, null, 2)); // Log para depuração
@@ -59,19 +62,19 @@ const UserDataScreen = ({ user }) => {
       <Text style={styles.title}>Meus Dados</Text>
 
       <Text style={styles.label}>Nome</Text>
-      <TextInput style={styles.input} value={name} onChangeText={setName} />
+      <TextInput style={styles.input} value={name} onChangeText={setName} placeholderTextColor={theme.colors.muted} />
 
       <Text style={styles.label}>E-mail</Text>
-      <TextInput style={styles.input} value={email} onChangeText={setEmail} keyboardType="email-address" />
+      <TextInput style={styles.input} value={email} onChangeText={setEmail} keyboardType="email-address" placeholderTextColor={theme.colors.muted} />
 
       <Text style={styles.title}>Alterar Senha</Text>
       <Text style={styles.infoText}>Deixe em branco para não alterar</Text>
       
       <Text style={styles.label}>Nova Senha</Text>
-      <TextInput style={styles.input} secureTextEntry value={password} onChangeText={setPassword} />
+      <TextInput style={styles.input} secureTextEntry value={password} onChangeText={setPassword} placeholderTextColor={theme.colors.muted} />
 
       <Text style={styles.label}>Confirmar Nova Senha</Text>
-      <TextInput style={styles.input} secureTextEntry value={confirmPassword} onChangeText={setConfirmPassword} />
+      <TextInput style={styles.input} secureTextEntry value={confirmPassword} onChangeText={setConfirmPassword} placeholderTextColor={theme.colors.muted} />
 
       <TouchableOpacity style={styles.button} onPress={handleUpdate}>
         <Text style={styles.buttonText}>Salvar Alterações</Text>
@@ -81,58 +84,58 @@ const UserDataScreen = ({ user }) => {
   );
 };
 
-const styles = StyleSheet.create({
+const createStyles = (theme) => StyleSheet.create({
   keyboardContainer: {
     flex: 1,
-    backgroundColor: '#0b1220',
+    backgroundColor: theme.colors.background,
   },
   container: {
     flexGrow: 1,
-    backgroundColor: '#0b1220',
+    backgroundColor: theme.colors.background,
     padding: 20,
   },
   title: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: '#f9fafb',
+    ...typography.h1,
+    color: theme.colors.text,
     marginBottom: 20,
     marginTop: 10,
     textAlign: 'center',
   },
   label: {
-    fontSize: 16,
-    color: '#e5e7eb',
-    fontWeight: '600',
+    ...typography.bodyStrong,
+    color: theme.colors.textSecondary,
     marginBottom: 8,
     alignSelf: 'flex-start',
   },
   input: {
     width: '100%',
     height: 50,
-    backgroundColor: '#1f2937',
+    backgroundColor: theme.colors.card,
     borderRadius: 8,
     paddingHorizontal: 15,
     fontSize: 16,
-    color: '#fff',
+    color: theme.colors.text,
     marginBottom: 20,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
   },
   button: {
     width: '100%',
     height: 50,
-    backgroundColor: '#3b82f6',
+    backgroundColor: theme.colors.primary,
     borderRadius: 8,
     alignItems: 'center',
     justifyContent: 'center',
     marginTop: 20,
   },
   buttonText: {
-    color: '#fff',
+    color: '#ffffff',
     fontSize: 18,
     fontWeight: 'bold',
   },
   infoText: {
-    color: '#e5e7eb',
-    fontSize: 14,
+    ...typography.small,
+    color: theme.colors.muted,
     textAlign: 'center',
     marginBottom: 20,
   },

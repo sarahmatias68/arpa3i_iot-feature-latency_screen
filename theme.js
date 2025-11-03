@@ -1,5 +1,5 @@
 // Centralized theme constants for ARPA3I app
-// Light, Dark and AMOLED variants
+// Light and Dark variants
 
 export const THEMES = {
   light: {
@@ -33,28 +33,11 @@ export const THEMES = {
       success: '#10b981',
       overlay: 'rgba(0,0,0,0.5)'
     }
-  },
-  amoled: {
-    name: 'amoled',
-    colors: {
-      background: '#000000',
-      card: '#000000',
-      border: '#111111',
-      text: '#ffffff',
-      textSecondary: '#e5e7eb',
-      muted: '#9ca3af',
-      primary: '#2563eb',
-      danger: '#ef4444',
-      warning: '#f59e0b',
-      success: '#10b981',
-      overlay: 'rgba(0,0,0,0.6)'
-    }
   }
 };
 
 export function getTheme(name) {
   if (name === 'light') return THEMES.light;
-  if (name === 'amoled') return THEMES.amoled;
   return THEMES.dark;
 }
 

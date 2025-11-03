@@ -2,8 +2,10 @@ import { View, Text, StyleSheet, StatusBar, TouchableOpacity, ScrollView } from 
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useAlerts } from './AlertsContext';
 import DeviceTypeSelector from './DeviceTypeSelector';
+import { getTheme, typography } from './theme';
+import { LogsScreen} from './LogsScreen';
 
-export default function CategoryDevicesScreen({ route, navigation }) {
+export default function CategoryDevicesScreen({ route, navigation, themeName = 'dark' }) {
   const { categoryTitle, categoryIcon, categoryKey, focusDeviceId } = route.params || {};
   
   const {
@@ -43,21 +45,37 @@ export default function CategoryDevicesScreen({ route, navigation }) {
 
   const [typeSelectorVisible, setTypeSelectorVisible] = useState(false);
   const [selectedDeviceId, setSelectedDeviceId] = useState(null);
+  const theme = useMemo(() => getTheme(themeName), [themeName]);
+  const styles = useMemo(() => createStyles(theme), [theme]);
 
   const getBatteryColor = (battery) => {
-    if (battery == null) return '#6b7280';
-    if (battery <= 2800) return '#ef4444';
-    if (battery <= 3600) return '#facc15';
-    return '#22c55e';
+    if (battery == null) return theme.colors.muted;
+    if (battery <= 2800) return theme.colors.danger;
+    if (battery <= 3600) return theme.colors.warning;
+    return theme.colors.success;
   };
 
   const getColorForSensorState = (state) => {
     switch (state) {
-      case 'Ambiente Seguro': return '#22c55e';
-      case 'Vazamento de Gás': return '#facc15';
-      case 'Fumaça Detectada': return '#ef4444';
-      default: return '#6b7280';
+      case 'Ambiente Seguro': return theme.colors.success;
+      case 'Vazamento de Gás': return theme.colors.warning;
+      case 'Fumaça Detectada': return theme.colors.danger;
+      default: return theme.colors.muted;
     }
+  };
+
+  const formatDuration = (ms) => {
+    const totalSeconds = Math.floor(ms / 1000);
+    const hours = Math.floor(totalSeconds / 3600);
+    const minutes = Math.floor((totalSeconds % 3600) / 60);
+    const seconds = totalSeconds % 60;
+    if (hours > 0) {
+      return `${hours}h ${minutes}m`;
+    }
+    if (minutes > 0) {
+      return `${minutes}m ${seconds}s`;
+    }
+    return `${seconds}s`;
   };
 
   const handleRemoveType = async (deviceId) => {
@@ -79,12 +97,15 @@ export default function CategoryDevicesScreen({ route, navigation }) {
 
   const renderDeviceCard = (device) => {
     const deviceType = deviceTypes.find(t => t.id === device.deviceType);
-    const typeConfig = deviceType || { name: "Sem tipo", color: "#6b7280" };
+    const typeConfig = deviceType || { name: "Sem tipo", color: theme.colors.muted };
     const hasType = !!device.deviceType;
     const isSensorDevice = device.deviceId === "SENSOR_GAS_FUMACA";
 
     const statusText = device.connected ? 'Online' : 'Offline';
-    const statusColor = device.connected ? '#22c55e' : '#6b7280';
+    const statusColor = device.connected ? theme.colors.success : theme.colors.muted;
+    const offlineDuration = !device.connected && device.lastSeen
+      ? Math.max(0, Date.now() - device.lastSeen)
+      : null;
     
     const isAlertActive = !!device.lastAlertType;
     const alertStyle = 
@@ -96,8 +117,8 @@ export default function CategoryDevicesScreen({ route, navigation }) {
         device.lastAlertType === 'QUEDA' ? 'QUEDA DETECTADA' : statusText;
 
     const alertStatusColor = 
-        device.lastAlertType === 'PANICO' ? '#ef4444' :
-        device.lastAlertType === 'QUEDA' ? '#f59e0b' : statusColor;
+        device.lastAlertType === 'PANICO' ? theme.colors.danger :
+        device.lastAlertType === 'QUEDA' ? theme.colors.warning : statusColor;
 
     return (
       <TouchableOpacity 
@@ -111,7 +132,7 @@ export default function CategoryDevicesScreen({ route, navigation }) {
             {isSensorDevice ? "Sensor de Gás e Fumaça" : device.deviceId}
           </Text>
           {!isSensorDevice && (
-            <View style={styles.typeButtonsContainer}>
+            <View style={styles.actionsColumn}>
               <TouchableOpacity 
                 style={[
                   styles.typeButton, 
@@ -131,9 +152,17 @@ export default function CategoryDevicesScreen({ route, navigation }) {
                   disabled={isAlertActive}
                   hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
                 >
-                  <Text style={styles.removeButtonText}>Remover Tipo</Text>
+                  <Text style={styles.removeButtonText}>Limpar Tipo</Text>
                 </TouchableOpacity>
               )}
+              <TouchableOpacity 
+                style={[styles.eventsButton, isAlertActive && styles.buttonDisabled]}
+                onPress={() => navigation.navigate('DeviceEvents', { deviceId: device.deviceId })}
+                disabled={isAlertActive}
+                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+              >
+                <Text style={styles.eventsButtonText}>Eventos</Text>
+              </TouchableOpacity>
             </View>
           )}
         </View>
@@ -150,6 +179,11 @@ export default function CategoryDevicesScreen({ route, navigation }) {
         ) : (
           <Text style={[styles.deviceStatus, { color: alertStatusColor }]}>
             {alertStatusText}
+          </Text>
+        )}
+        {!device.connected && offlineDuration && (
+          <Text style={styles.offlineTimer}>
+            Offline há {formatDuration(offlineDuration)}
           </Text>
         )}
         {!isSensorDevice && isAlertActive && !!device.lastAlertAt && (
@@ -197,7 +231,7 @@ export default function CategoryDevicesScreen({ route, navigation }) {
 
   return (
     <View style={styles.container}>
-      <StatusBar barStyle="light-content" />
+      <StatusBar barStyle={theme.name === 'light' ? 'dark-content' : 'light-content'} />
       
       <ScrollView 
         ref={scrollRef}
@@ -231,10 +265,10 @@ export default function CategoryDevicesScreen({ route, navigation }) {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (theme) => StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#0b1220',
+    backgroundColor: theme.colors.background,
   },
   scrollView: {
     flex: 1,
@@ -248,57 +282,61 @@ const styles = StyleSheet.create({
     marginBottom: 30,
     paddingBottom: 20,
     borderBottomWidth: 1,
-    borderBottomColor: '#374151',
+    borderBottomColor: theme.colors.border,
   },
   headerIcon: {
     fontSize: 60,
     marginBottom: 10,
   },
   headerTitle: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: '#f9fafb',
+    ...typography.h1,
+    color: theme.colors.text,
     marginBottom: 5,
+    textAlign: 'center',
   },
   deviceCount: {
-    fontSize: 14,
-    color: '#f3f4f6',
+    ...typography.small,
+    color: theme.colors.muted,
   },
   deviceCard: {
-    backgroundColor: '#1f2937',
+    backgroundColor: theme.colors.card,
     borderRadius: 12,
     padding: 16,
     marginBottom: 15,
-    borderWidth: 2,
-    borderColor: '#374151',
+    borderWidth: 1,
+    borderColor: theme.colors.border,
   },
   deviceHeader: {
     marginBottom: 12,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    gap: 12,
   },
   deviceTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#f3f4f6',
-    marginBottom: 10,
+    ...typography.h3,
+    color: theme.colors.text,
+    marginBottom: 6,
+    textAlign: 'left',
+    flexShrink: 1,
   },
-  typeButtonsContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
+  actionsColumn: {
+    alignItems: 'flex-end',
     gap: 8,
-    flexWrap: 'wrap',
   },
   typeButton: {
     paddingHorizontal: 12,
     paddingVertical: 8,
     borderRadius: 8,
+    backgroundColor: theme.colors.primary,
   },
   typeButtonText: {
-    color: '#ffffff',
+    color: theme.name === 'light' ? '#ffffff' : theme.colors.text,
     fontSize: 13,
     fontWeight: 'bold',
   },
   removeButton: {
-    backgroundColor: '#ef4444',
+    backgroundColor: theme.colors.danger,
     paddingHorizontal: 12,
     paddingVertical: 8,
     borderRadius: 8,
@@ -308,53 +346,69 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: 'bold',
   },
+  eventsButton: {
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: theme.colors.primary,
+    backgroundColor: theme.colors.card,
+  },
+  eventsButtonText: {
+    color: theme.colors.primary,
+    fontSize: 13,
+    fontWeight: 'bold',
+  },
   buttonDisabled: {
     opacity: 0.5,
   },
   deviceStatus: {
     marginTop: 6,
-    fontSize: 14,
-    fontWeight: 'bold',
+    ...typography.smallStrong,
     marginBottom: 8,
   },
   sensorStateContainer: {
     marginTop: 12,
     padding: 15,
-    backgroundColor: '#111827',
+    backgroundColor: theme.name === 'light' ? '#e5e7eb' : '#111827',
     borderRadius: 8,
     alignItems: 'center',
   },
   sensorStateLabel: {
-    fontSize: 14,
-    color: '#9ca3af',
+    ...typography.small,
+    color: theme.colors.muted,
     marginBottom: 8,
   },
   sensorStateText: {
-    fontSize: 20,
-    fontWeight: 'bold',
+    ...typography.h2,
+    color: theme.colors.text,
   },
   deviceInfoBlock: {
     marginTop: 12,
     gap: 5,
   },
   deviceInfoText: {
-    fontSize: 13,
-    color: '#d1d5db',
+    ...typography.small,
+    color: theme.colors.muted,
+  },
+  offlineTimer: {
+    marginTop: 4,
+    ...typography.smallStrong,
+    color: theme.colors.muted,
   },
   cardPanicActive: {
-    borderWidth: 3,
-    borderColor: '#ef4444',
-    backgroundColor: '#331111',
+    borderWidth: 2,
+    borderColor: theme.colors.danger,
+    backgroundColor: theme.name === 'light' ? '#fee2e2' : '#331111',
   },
   cardFallActive: {
-    borderWidth: 3,
-    borderColor: '#f59e0b',
-    backgroundColor: '#3b2f0a',
+    borderWidth: 2,
+    borderColor: theme.colors.warning,
+    backgroundColor: theme.name === 'light' ? '#fef3c7' : '#3b2f0a',
   },
   ackHint: {
     marginTop: 8,
-    fontSize: 12,
-    fontWeight: 'bold',
+    ...typography.smallStrong,
   },
   emptyState: {
     alignItems: 'center',
@@ -362,8 +416,8 @@ const styles = StyleSheet.create({
     paddingVertical: 60,
   },
   emptyStateText: {
-    fontSize: 16,
-    color: '#9ca3af',
+    ...typography.body,
+    color: theme.colors.muted,
     textAlign: 'center',
   },
 });
