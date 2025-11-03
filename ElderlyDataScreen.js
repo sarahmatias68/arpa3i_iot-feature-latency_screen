@@ -2,7 +2,7 @@ import { useState, useCallback } from 'react';
 import { View, Text, TextInput, StyleSheet, ScrollView, ActivityIndicator, Alert, TouchableOpacity, KeyboardAvoidingView, Platform } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 
-const API_URL = 'http://192.168.1.7:86';
+const API_URL = 'http://192.168.2.115:86';
 
 const ElderlyDataScreen = () => {
   const [elderlyData, setElderlyData] = useState(null);
@@ -201,10 +201,11 @@ const styles = StyleSheet.create({
   },
   container: {
     flex: 1,
-    backgroundColor: '#7a8a99',
+    backgroundColor: '#0b1220',
   },
   contentContainer: {
     padding: 20,
+    backgroundColor: '#0b1220',
   },
   loader: {
     flex: 1,

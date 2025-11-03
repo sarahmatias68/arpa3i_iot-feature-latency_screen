@@ -4,6 +4,8 @@ import { TouchableOpacity } from "react-native";
 import {
   NavigationContainer,
   useNavigationContainerRef,
+  DarkTheme as NavDarkTheme,
+  DefaultTheme as NavLightTheme,
 } from "@react-navigation/native";
 
 import { createStackNavigator } from "@react-navigation/stack";
@@ -39,10 +41,12 @@ export default function App() {
   const [expoPushToken, setExpoPushToken] = useState("");
   const [user, setUser] = useState(null); // Estado para controlar o usuário logado
   const [pendingNav, setPendingNav] = useState(null); // guarda navegação pendente ao clicar na notificação sem sessão
+  const [themeName, setThemeName] = useState('dark');
 
   // --- ADICIONADO ---
   // Ref para navegar ao clicar na notificação
   const navigationRef = useNavigationContainerRef();
+  const SERVER_HTTP_BASE = "http://192.168.2.115:86";
 
   // --- USE EFFECT: auto-login (persistência de sessão) ---
   useEffect(() => {
@@ -53,6 +57,8 @@ export default function App() {
           const savedUser = JSON.parse(json);
           setUser(savedUser);
         }
+        const savedTheme = await AsyncStorage.getItem('app_theme');
+        if (savedTheme) setThemeName(savedTheme);
       } catch (e) {
         console.warn("Falha ao carregar sessão persistida:", e);
       }
@@ -103,19 +109,38 @@ export default function App() {
     AsyncStorage.removeItem("arp_user").catch(() => {});
   };
 
+  // Resolve rota de destino com base no deviceId consultando /devices para obter deviceType
+  const resolveRouteForDevice = async (deviceId) => {
+    let dtype;
+    try {
+      const res = await fetch(`${SERVER_HTTP_BASE}/devices`);
+      if (res.ok) {
+        const items = await res.json();
+        const found = items.find((it) => it.deviceId === deviceId);
+        dtype = found?.deviceType;
+      }
+    } catch (_) {}
+    if (dtype === 'gas_fumaca') {
+      return { routeName: 'CategoryDevices', params: { categoryTitle: 'Sensores de Gás e Fumaça', categoryIcon: '🛡️', categoryKey: 'sensores', focusDeviceId: deviceId } };
+    } else if (dtype === 'pulseira') {
+      return { routeName: 'CategoryDevices', params: { categoryTitle: 'Pulseiras Assistivas', categoryIcon: '⌚', categoryKey: 'pulseira', focusDeviceId: deviceId } };
+    } else if (dtype === 'barreira' || dtype === 'microondas' || dtype === 'detector') {
+      return { routeName: 'CategoryDevices', params: { categoryTitle: 'Detectores de Queda', categoryIcon: '📱', categoryKey: 'detector', focusDeviceId: deviceId } };
+    }
+    // Fallback
+    return { routeName: 'Main', params: {} };
+  };
+
   // --- USE EFFECT: FCM click handling (app em background) ---
   useEffect(() => {
     const unsubscribe = messaging().onNotificationOpenedApp((remoteMessage) => {
       if (!remoteMessage) return;
-      const deviceId = remoteMessage.data?.deviceId;
-      const alertType = remoteMessage.data?.alertType;
-      const params = deviceId ? { focusDeviceId: deviceId, alertType } : {};
-      const action = { routeName: "Main", params };
-      if (user) {
-        navigationRef.current?.navigate(action.routeName, action.params);
-      } else {
-        setPendingNav(action);
-      }
+      (async () => {
+        const deviceId = remoteMessage.data?.deviceId || remoteMessage.data?.dispositivo || remoteMessage.data?.device_id;
+        const action = deviceId ? await resolveRouteForDevice(deviceId) : { routeName: 'Main', params: {} };
+        if (user) navigationRef.current?.navigate(action.routeName, action.params);
+        else setPendingNav(action);
+      })();
     });
     return unsubscribe;
   }, [user, navigationRef]);
@@ -125,21 +150,29 @@ export default function App() {
     (async () => {
       const remoteMessage = await messaging().getInitialNotification();
       if (!remoteMessage) return;
-      const deviceId = remoteMessage.data?.deviceId;
-      const alertType = remoteMessage.data?.alertType;
-      const params = deviceId ? { focusDeviceId: deviceId, alertType } : {};
-      const action = { routeName: "Main", params };
-      if (user) {
-        navigationRef.current?.navigate(action.routeName, action.params);
-      } else {
-        setPendingNav(action);
-      }
+      const deviceId = remoteMessage.data?.deviceId || remoteMessage.data?.dispositivo || remoteMessage.data?.device_id;
+      const action = deviceId ? await resolveRouteForDevice(deviceId) : { routeName: 'Main', params: {} };
+      if (user) navigationRef.current?.navigate(action.routeName, action.params);
+      else setPendingNav(action);
     })();
   }, [user, navigationRef]);
 
+  const AmoledTheme = {
+    ...NavDarkTheme,
+    colors: {
+      ...NavDarkTheme.colors,
+      background: '#000000',
+      card: '#000000',
+      border: '#111111',
+      text: '#ffffff',
+    },
+  };
+
+  const navTheme = themeName === 'light' ? NavLightTheme : (themeName === 'amoled' ? AmoledTheme : NavDarkTheme);
+
   return (
     // REF ADICIONADA AO CONTAINER
-    <NavigationContainer ref={navigationRef}>
+    <NavigationContainer ref={navigationRef} theme={navTheme}>
       <AlertsProvider user={user}>
         <NotificationHandler isAuthenticated={!!user} />
         <Stack.Navigator screenOptions={{ headerShown: false }}>
@@ -176,6 +209,9 @@ export default function App() {
                 options={({ route }) => ({
                   headerShown: true,
                   title: route.params?.categoryTitle || "Dispositivos",
+                  headerStyle: { backgroundColor: "#1f2937" },
+                  headerTintColor: "#f9fafb",
+                  headerTitleStyle: { fontWeight: "bold" },
                 })}
               />
               <Stack.Screen
@@ -194,7 +230,15 @@ export default function App() {
                 }}
               >
                 {(props) => (
-                  <SettingsScreen {...props} onLogout={handleLogout} />
+                  <SettingsScreen
+                    {...props}
+                    onLogout={handleLogout}
+                    themeName={themeName}
+                    onChangeTheme={async (name) => {
+                      setThemeName(name);
+                      try { await AsyncStorage.setItem('app_theme', name); } catch {}
+                    }}
+                  />
                 )}
               </Stack.Screen>
               <Stack.Screen

@@ -3,7 +3,7 @@ import { View, Text, StyleSheet, FlatList, TouchableOpacity, Alert, ActivityIndi
 import { useFocusEffect } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 
-const API_URL = 'http://192.168.1.7:86';
+const API_URL = 'http://192.168.2.115:86';
 
 const UserListScreen = () => {
   const [users, setUsers] = useState([]);
@@ -153,9 +153,9 @@ const UserListScreen = () => {
 };
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#7a8a99' },
+  container: { flex: 1, backgroundColor: '#0b1220' },
   loader: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#111827' },
-  userItem: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 20, borderBottomWidth: 1, borderBottomColor: '#374151' },
+  userItem: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 20, borderBottomWidth: 1, borderBottomColor: '#374151', backgroundColor: '#1f2937' },
   userInfo: { flex: 1 },
   userName: { color: '#f9fafb', fontSize: 18, fontWeight: 'bold' },
   userEmail: { color: '#d1d5db', fontSize: 14 },

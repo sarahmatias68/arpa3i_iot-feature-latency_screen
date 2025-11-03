@@ -38,7 +38,7 @@ export default function MainScreen({ navigation, user }) {
 
   const pulseiraDevices = getDevicesByType('pulseira');
   const detectorDevices = [...getDevicesByType('barreira'), ...getDevicesByType('microondas'), ...getDevicesByType('detector')];
-  const sensorDevices = getDevicesByType('outros');
+  const sensorDevices = getDevicesByType('gas_fumaca').filter(d => d.deviceId !== 'SENSOR_GAS_FUMACA');
   const newDevices = getNewDevices();
 
   const handleRemoveType = async (deviceId) => {
@@ -76,8 +76,8 @@ export default function MainScreen({ navigation, user }) {
       <TouchableOpacity 
         key={device.deviceId} 
         style={[styles.subCard, alertStyle]}
-        // <<-- CORREÇÃO: Chama a função unificada ao tocar no card em alerta -->>
         onPress={isAlertActive ? () => acknowledgeAlert(device.deviceId, device.lastAlertType) : undefined}
+        activeOpacity={0.8}
       >
         <View style={styles.deviceHeader}>
           <Text style={styles.subTitle} numberOfLines={1} ellipsizeMode="tail">{device.deviceId}</Text>
@@ -90,6 +90,7 @@ export default function MainScreen({ navigation, user }) {
               ]}
               onPress={() => !isAlertActive && showTypeSelector(device.deviceId)}
               disabled={isAlertActive}
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
             >
               <Text style={styles.typeButtonText}>{typeConfig.name}</Text>
             </TouchableOpacity>
@@ -98,6 +99,7 @@ export default function MainScreen({ navigation, user }) {
                 style={[styles.removeButton, isAlertActive && styles.buttonDisabled]}
                 onPress={() => !isAlertActive && handleRemoveType(device.deviceId)}
                 disabled={isAlertActive}
+                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
               >
                 <Text style={styles.removeButtonText}>Remover Tipo</Text>
               </TouchableOpacity>
@@ -107,6 +109,11 @@ export default function MainScreen({ navigation, user }) {
         <Text style={[styles.subStatus, { color: alertStatusColor }]}>
           {alertStatusText}
         </Text>
+        {isAlertActive && !!device.lastAlertAt && (
+          <Text style={styles.deviceInfoText}>
+            Notificado: {new Date(device.lastAlertAt).toLocaleString()}
+          </Text>
+        )}
         {device.connected && (
           <View style={styles.deviceInfoBlock}>
             {typeof device.batteryMv === 'number' && (
@@ -130,6 +137,11 @@ export default function MainScreen({ navigation, user }) {
             )}
             {device.reconnects !== undefined && (
               <Text style={styles.deviceInfoText}>Reconexões: {device.reconnects}</Text>
+            )}
+            {typeof device.lastSeen === 'number' && device.lastSeen > 0 && (
+              <Text style={styles.deviceInfoText}>
+                Atualizado há {Math.max(0, Math.floor((Date.now() - device.lastSeen)/1000))}s
+              </Text>
             )}
           </View>
         )}
@@ -158,13 +170,15 @@ export default function MainScreen({ navigation, user }) {
     return devices.map(device => renderDeviceCard(device));
   };
 
-  const renderCategoryButton = (title, icon, devices, categoryKey) => {
-    const alertCount = getAlertCount(devices);
+  const renderCategoryButton = (title, icon, devices, categoryKey, status, prependText) => {
+    // status: { text: string | null, bg: string | null }
+    const bgColor = status?.bg || '#2d3748';
+    const statusText = status?.text || null;
 
     return (
       <View style={styles.categoryContainer}>
         <TouchableOpacity 
-          style={styles.categoryButton}
+          style={[styles.categoryButton, { backgroundColor: bgColor }]}
           onPress={() => navigation.navigate('CategoryDevices', {
             categoryTitle: title,
             categoryIcon: icon,
@@ -173,17 +187,18 @@ export default function MainScreen({ navigation, user }) {
           activeOpacity={0.7}
         >
           <View style={styles.categoryContent}>
+            {prependText && (
+              <Text style={styles.categoryStatus}>{prependText}</Text>
+            )}
             <Text style={styles.categoryIcon}>{icon}</Text>
             <Text style={styles.categoryTitle}>{title}</Text>
             {devices.length > 0 && (
               <Text style={styles.categoryCount}>({devices.length})</Text>
             )}
+            {statusText && (
+              <Text style={styles.categoryStatus}>{statusText}</Text>
+            )}
           </View>
-          {alertCount > 0 && (
-            <View style={styles.alertBadge}>
-              <Text style={styles.alertBadgeText}>{alertCount}</Text>
-            </View>
-          )}
         </TouchableOpacity>
       </View>
     );
@@ -209,23 +224,48 @@ export default function MainScreen({ navigation, user }) {
           </View>
         )}
 
-        {renderCategoryButton('Sensores de Gás e Fumaça', '🛡️', sensorDevices, 'sensores')}
-        {renderCategoryButton('Pulseiras Assistivas', '⌚', pulseiraDevices, 'pulseira')}
-        {renderCategoryButton('Detectores de Queda', '📱', detectorDevices, 'detector')}
+        {renderCategoryButton(
+          'Sensores de Gás e Fumaça',
+          '🛡️',
+          sensorDevices,
+          'sensores',
+          (() => {
+            // Verde e mensagem "Ambiente Seguro" quando NÃO há alerta ativo
+            if (sensorState === 'Vazamento de Gás') {
+              return { text: 'Gás Detectado', bg: '#7f1d1d' };
+            }
+            if (sensorState === 'Fumaça Detectada') {
+              return { text: 'Fumaça Detectada', bg: '#7f1d1d' };
+            }
+            // Qualquer outro estado: considerar seguro
+            return { text: null, bg: null };
+          })(),
+          (sensorState === 'Vazamento de Gás' || sensorState === 'Fumaça Detectada') ? null : 'Ambiente Seguro'
+        )}
+        {renderCategoryButton(
+          'Pulseiras Assistivas',
+          '⌚',
+          pulseiraDevices,
+          'pulseira',
+          (() => {
+            const hasPanic = pulseiraDevices.some(d => d.lastAlertType === 'PANICO');
+            return hasPanic ? { text: 'Socorro Solicitado', bg: '#7f1d1d' } : { text: null, bg: null };
+          })()
+        )}
+        {renderCategoryButton(
+          'Detectores de Queda',
+          '📱',
+          detectorDevices,
+          'detector',
+          (() => {
+            const hasFall = detectorDevices.some(d => d.lastAlertType === 'QUEDA');
+            return hasFall ? { text: 'Queda Detectada', bg: '#7f1d1d' } : { text: null, bg: null };
+          })()
+        )}
 
       </ScrollView>
 
-      {activeAlert && (
-        <View style={styles.alertOverlay}>
-          <View style={styles.alertBox}>
-            <Text style={styles.alertTitle}>{activeAlert.title}</Text>
-            <Text style={styles.alertMessage}>{activeAlert.message}</Text>
-            <TouchableOpacity style={styles.alertButton} onPress={dismissActiveAlert}>
-              <Text style={styles.alertButtonText}>OK</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-      )}
+      
 
       <DeviceTypeSelector
         visible={typeSelectorVisible}
@@ -241,7 +281,7 @@ export default function MainScreen({ navigation, user }) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#7a8a99',
+    backgroundColor: '#0b1220',
   },
   scrollView: {
     flex: 1,
@@ -250,6 +290,8 @@ const styles = StyleSheet.create({
     padding: 20,
     paddingBottom: 40,
     alignItems: 'center',
+    flexGrow: 1,
+    justifyContent: 'center',
   },
   newDevicesSection: {
     backgroundColor: '#1f2937',
@@ -301,6 +343,13 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     color: '#ffffff',
     textAlign: 'center',
+  },
+  categoryStatus: {
+    fontSize: 14,
+    color: '#e5e7eb',
+    marginTop: 6,
+    textAlign: 'center',
+    fontWeight: '600',
   },
   categoryCount: {
     fontSize: 14,

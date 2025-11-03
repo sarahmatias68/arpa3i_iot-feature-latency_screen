@@ -1,8 +1,8 @@
-// v21 Modificado - Implementação do Canal de Notificações com Servidor em Nuvem
-// - Baseado na v20 estável.
-// - Removida a retransmissão automática de mensagens HEARTBEAT.
-// - Adicionada a lógica de "Canal de Broadcast": qualquer mensagem
-//   do tipo "SYSTEM_BROADCAST" é retransmitida para todos os clientes.
+// v23 - Versão Servidor Puro (Base v22)
+// - Removida toda a lógica de sensor local (MQ2_PIN, verificarSensor(), etc.)
+// - Adicionada lógica para RECEBER alertas de GAS e FUMACA via WebSocket.
+// - Implementada a solução de estabilidade "cleanupInterval" no loop().
+// - Mantidas todas as correções de bugs (NTP, WDT, SQLite).
 
 #include <WiFi.h>
 #include <WiFiManager.h>
@@ -19,14 +19,12 @@
 #include <WiFiClientSecure.h> // Necessário para HTTPS
 
 // --- CONFIGURAÇÕES ---
-const int MQ2_PIN = 33;
 const int SD_CS_PIN = 5;
 const int BACKUP_BUTTON_PIN = 27;
 const char* ntpServer = "pool.ntp.org";
 const long gmtOffset_sec = -10800; // GMT-3
 const int daylightOffset_sec = 0;
 const int WDT_TIMEOUT_S = 10;
-// URL do servidor Vercel para envio de alertas (SEM a barra final)
 const char* vercelServerUrl = "https://vercel-arpa3i.vercel.app/api/alert";
 
 // --- VARIÁVEIS GLOBAIS ---
@@ -34,18 +32,19 @@ const char* myApiKey = "f4b3c2d1-a6e5-4f78-9b9c-8e0d3a2b1c0f-arpa3i"; // Sua cha
 AsyncWebServer server(86);
 AsyncWebSocket ws("/ws");
 std::map<uint32_t, String> clientDeviceIds;
-String ultimoEstadoSensor = "Ambiente Seguro";
 unsigned long ultimoPing = 0;
 
 // --- VARIÁVEIS PARA LOG DE ALERTA ASSÍNCRONO ---
 volatile bool alertPending = false;
 String pendingAlertType;
 String pendingAlertMessage;
+volatile bool g_broadcastPending = false;
+String g_broadcastMessage;
 
 // --- VARIÁVEIS GLOBAIS ADICIONAIS ---
 bool cloudServerAvailable = true;
 int failedCloudConnections = 0;
-const int maxFailedConnections = 5; // Ajuste o n° de tentativas se desejar
+const int maxFailedConnections = 5; 
 
 // --- CONFIGURAÇÕES DO BANCO DE DADOS E BACKUP ---
 sqlite3 *db;
@@ -62,14 +61,13 @@ const long debounceDelay = 50;
 
 // --- PROTÓTIPOS ---
 void setupWebSocket();
-void enviarEstadoSensor(String estado);
-void verificarSensor();
 void enviarPing();
 void initDatabase();
 void handleUserResetPassword(AsyncWebServerRequest *request);
 void logAlert(const char* alertType, const char* message);
 void handleAlertLogging();
 void handleBackupButton();
+void handleBroadcasts();
 String getFormattedTime();
 void WiFiEvent(WiFiEvent_t event, WiFiEventInfo_t info);
 void onEvent(AsyncWebSocket *server, AsyncWebSocketClient *client, AwsEventType type, void *arg, uint8_t *data, size_t len);
@@ -85,10 +83,16 @@ void handleUserDelete(AsyncWebServerRequest *request);
 void handleElderlyGet(AsyncWebServerRequest *request);
 void handleElderlyAdd(AsyncWebServerRequest *request);
 void handleElderlyUpdate(AsyncWebServerRequest *request);
+void handleDevicesGet(AsyncWebServerRequest *request);
+void handleDevicesSet(AsyncWebServerRequest *request);
+void handleDevicesDelete(AsyncWebServerRequest *request);
 void handleAlertsGet(AsyncWebServerRequest *request);
 void handleAcknowledgeAlert(AsyncWebServerRequest *request);
 void broadcastFallAlert(String local, String dispositivo);
 void broadcastPanicAlert(String dispositivo);
+void broadcastGasAlert(String local, String dispositivo);
+void broadcastSmokeAlert(String local, String dispositivo);
+// ---
 bool acknowledgeLatestAlert(String user);
 void sendAckToClient(AsyncWebSocketClient *client, const char* alertType);
 void enviarAlertaVercel(String tipoAlerta, String local, String dispositivo);
@@ -104,7 +108,6 @@ void wifiManagerCallback(WiFiManager *myWiFiManager) {
 
 void setup() {
     Serial.begin(115200);
-    pinMode(MQ2_PIN, INPUT);
     pinMode(BACKUP_BUTTON_PIN, INPUT_PULLUP);
 
     if (!SD.begin(SD_CS_PIN)) {
@@ -129,7 +132,23 @@ void setup() {
     Serial.println("IP: " + WiFi.localIP().toString());
 
     configTime(gmtOffset_sec, daylightOffset_sec, ntpServer);
-    logAlert("INFO", ("Sistema iniciado. IP: " + WiFi.localIP().toString()).c_str());
+    
+    Serial.println("Aguardando sincronizacao do NTP...");
+    struct tm timeinfo;
+    long startTime = millis();
+    const long ntpTimeout = 10000; 
+
+    while ((!getLocalTime(&timeinfo) || timeinfo.tm_year < 120) && (millis() - startTime < ntpTimeout)) {
+        delay(100); 
+    }
+
+    if (millis() - startTime >= ntpTimeout) {
+        Serial.println("Timeout! Nao foi possivel sincronizar o NTP.");
+        logAlert("ERRO_NTP", "Falha ao sincronizar NTP na inicializacao"); 
+    } else {
+        Serial.println("NTP sincronizado com sucesso.");
+        logAlert("INFO", ("Sistema iniciado. IP: " + WiFi.localIP().toString()).c_str());
+    }
 
     setupWebSocket();
     DefaultHeaders::Instance().addHeader("Access-Control-Allow-Origin", "*");
@@ -145,13 +164,18 @@ void setup() {
     server.on("/elderly/update", HTTP_POST, handleElderlyUpdate);
     server.on("/alerts", HTTP_GET, handleAlertsGet);
     server.on("/acknowledge", HTTP_POST, handleAcknowledgeAlert);
+    
+    // --- Rotas de Gerenciamento de Dispositivos ---
+    server.on("/devices", HTTP_GET, handleDevicesGet);
+    server.on("/devices/set", HTTP_POST, handleDevicesSet);
+    server.on("/devices/delete", HTTP_POST, handleDevicesDelete);
+
+    // --- Configuração CORS ---
+    DefaultHeaders::Instance().addHeader("Access-Control-Allow-Methods", "GET,POST,OPTIONS");
+    DefaultHeaders::Instance().addHeader("Access-Control-Allow-Headers", "Content-Type");
     server.begin();
 
-    Serial.println("\n--- Comandos de Simulacao Disponiveis ---");
-    Serial.println("g: Simular Vazamento de Gas");
-    Serial.println("f: Simular Fumaca");
-    Serial.println("s: Simular Ambiente Seguro");
-    Serial.println("-----------------------------------------");
+    Serial.println("\n--- Servidor Arpa3i v23 Iniciado ---");
 
     esp_task_wdt_config_t wdt_config = { .timeout_ms = (uint32_t)(WDT_TIMEOUT_S * 1000), .trigger_panic = true };
     esp_task_wdt_init(&wdt_config);
@@ -160,39 +184,13 @@ void setup() {
 
 void loop() {
     esp_task_wdt_reset();
-    ws.cleanupClients();
-    verificarSensor();
     enviarPing();
     handleAlertLogging();
     handleBackup();
     handleBackupButton();
-
-    if (Serial.available() > 0) {
-        char input = Serial.read();
-        String estadoSimulado = "";
-        switch (input) {
-            case 'g': estadoSimulado = "Vazamento de Gás"; break;
-            case 'f': estadoSimulado = "Fumaça Detectada"; break;
-            case 's': estadoSimulado = "Ambiente Seguro"; break;
-        }
-        if (estadoSimulado != "") {
-            String logMsg = estadoSimulado;
-            logMsg.toUpperCase();
-            Serial.println("\n>>> SIMULANDO: " + logMsg + " <<<");
-
-            ultimoEstadoSensor = estadoSimulado;
-            enviarEstadoSensor(ultimoEstadoSensor);
-            if (estadoSimulado != "Ambiente Seguro") {
-                 if (!alertPending) {
-                    String msg = "Alerta simulado via Serial";
-                    const char* alertType = (estadoSimulado == "Fumaça Detectada") ? "FUMACA_SIMULADA" : "GAS_SIMULADO";
-                    pendingAlertType = alertType;
-                    pendingAlertMessage = msg;
-                    alertPending = true;
-                }
-            }
-        }
-    }
+    handleBroadcasts();
+    ws.cleanupClients();
+    //delay(10);
 }
 
 void sendAckToClient(AsyncWebSocketClient *client, const char* alertType) {
@@ -211,17 +209,12 @@ void onEvent(AsyncWebSocket *server, AsyncWebSocketClient *client, AwsEventType 
         String genericId = "Cliente #" + String(client->id());
         clientDeviceIds[client->id()] = genericId;
         Serial.printf("%s conectado. Aguardando ID personalizado...\n", genericId.c_str());
-        enviarEstadoSensor(ultimoEstadoSensor);
-
+        // Removido envio de estado de sensor legado
     } else if (type == WS_EVT_DISCONNECT) {
         String deviceId = clientDeviceIds[client->id()];
         Serial.printf("Dispositivo '%s' desconectado.\n", deviceId.c_str());
-        if (deviceId.startsWith("detector")) {
-            String json = "{\"type\":\"DEVICE_STATUS\",\"deviceId\":\"" + deviceId + "\",\"status\":\"offline\"}";
-            ws.textAll(json);
-        }
-        clientDeviceIds.erase(client->id());
-
+        String json = "{\"type\":\"DEVICE_STATUS\",\"deviceId\":\"" + deviceId + "\",\"status\":\"offline\"}";
+        ws.textAll(json);
     } else if (type == WS_EVT_DATA) {
         AwsFrameInfo *info = (AwsFrameInfo*)arg;
         if (info->final && info->index == 0 && info->len == len && info->opcode == WS_TEXT) {
@@ -235,10 +228,9 @@ void onEvent(AsyncWebSocket *server, AsyncWebSocketClient *client, AwsEventType 
                         Serial.printf("Cliente #%u ('%s') identificado como '%s'.\n", client->id(), clientDeviceIds[client->id()].c_str(), deviceId.c_str());
                         clientDeviceIds[client->id()] = deviceId;
 
-                        if (deviceId.startsWith("detector")) {
-                            String json = "{\"type\":\"DEVICE_STATUS\",\"deviceId\":\"" + deviceId + "\",\"status\":\"online\"}";
-                            ws.textAll(json);
-                        }
+                        // Emite ONLINE para qualquer tipo de dispositivo ao identificar o deviceId
+                        String json = "{\"type\":\"DEVICE_STATUS\",\"deviceId\":\"" + deviceId + "\",\"status\":\"online\"}";
+                        ws.textAll(json);
                     }
                 }
 
@@ -247,6 +239,8 @@ void onEvent(AsyncWebSocket *server, AsyncWebSocketClient *client, AwsEventType 
 
                 if (strcmp(type_msg, "ALERTA") == 0) {
                     const char* sub_type = doc["sub_type"] | "";
+                    JsonObject detalhes = doc["detalhes"];
+                    String local = detalhes["local"] | "desconhecido";
 
                     if (strcmp(sub_type, "PANICO") == 0) {
                         String logMsg = "Botao de panico acionado por: " + deviceId;
@@ -256,13 +250,25 @@ void onEvent(AsyncWebSocket *server, AsyncWebSocketClient *client, AwsEventType 
                         broadcastPanicAlert(deviceId);
 
                     } else if (strcmp(sub_type, "QUEDA") == 0) {
-                        JsonObject detalhes = doc["detalhes"];
-                        String local = detalhes["local"] | "desconhecido";
                         String logMsg = "Queda detectada por: " + deviceId + " (" + local + ")";
                         Serial.printf("--- ALERTA DE QUEDA recebido de '%s', sensor [%s] ---\n", deviceId.c_str(), local.c_str());
                         logAlert("QUEDA", logMsg.c_str());
                         sendAckToClient(client, "QUEDA");                        
                         broadcastFallAlert(local, deviceId);
+                    
+                    } else if (strcmp(sub_type, "GAS") == 0) {
+                        String logMsg = "GAS detectado por: " + deviceId + " (" + local + ")";
+                        Serial.printf("--- ALERTA DE GAS recebido de '%s', sensor [%s] ---\n", deviceId.c_str(), local.c_str());
+                        logAlert("GAS", logMsg.c_str());
+                        sendAckToClient(client, "GAS");
+                        broadcastGasAlert(local, deviceId);
+
+                    } else if (strcmp(sub_type, "FUMACA") == 0) {
+                        String logMsg = "FUMACA detectada por: " + deviceId + " (" + local + ")";
+                        Serial.printf("--- ALERTA DE FUMACA recebido de '%s', sensor [%s] ---\n", deviceId.c_str(), local.c_str());
+                        logAlert("FUMACA", logMsg.c_str());
+                        sendAckToClient(client, "FUMACA");
+                        broadcastSmokeAlert(local, deviceId);
                     }
                 }
                 else if (strcmp(type_msg, "ACK_ALERTA") == 0) {
@@ -273,42 +279,64 @@ void onEvent(AsyncWebSocket *server, AsyncWebSocketClient *client, AwsEventType 
                     }
                 }
                 else if (strcmp(type_msg, "HEARTBEAT") == 0) {
-                    String msg;
                     JsonObject hbData = doc["data"];
-                    long uptime_ms = hbData["uptime_ms"] | 0;
+                    long uptime_ms = hbData["uptime_ms"] | 0L;
                     int reconnects = hbData["reconnects"] | 0;
+                    int tensao_mV = hbData["tensao_mV"] | -1;
+                    float temp_cpu_c = hbData["temp_cpu_c"] | 0.0f;
+                    long free_heap_b = hbData["free_heap_b"] | 0L;
+                    int wifi_rssi_dbm = hbData["wifi_rssi_dbm"] | 0;
 
-                    if (hbData.containsKey("tensao_mV")) {
-                        int tensao_mV = hbData["tensao_mV"] | 0;
-                        Serial.printf("--- Heartbeat de '%s': Tensao=%dmV, Uptime=%lums, Reconexoes=%d ---\n",
-                                      deviceId.c_str(), tensao_mV, uptime_ms/1000, reconnects);
-                        msg = "Status: " + deviceId + " | Tensao: " + String(tensao_mV) + "mV | Uptime: " +
-                              String(uptime_ms/1000) + "s | Reconexoes: " + String(reconnects);
-                        if (tensao_mV < 3200) {
-                            logAlert("BATERIA_FRACA", ("Alerta de bateria fraca para: " + deviceId).c_str());
-                        }
-                    } else {
-                        float temp_cpu_c = hbData["temp_cpu_c"] | 0.0f;
-                        long free_heap_b = hbData["free_heap_b"] | 0L;
-                        int wifi_rssi_dbm = hbData["wifi_rssi_dbm"] | 0;
-                        Serial.printf("--- Heartbeat de '%s': Temp=%.1fC, Heap=%ldB, RSSI=%ddBm, Uptime=%lums, Reconexoes=%d ---\n",
-                                      deviceId.c_str(), temp_cpu_c, free_heap_b, wifi_rssi_dbm, uptime_ms/1000, reconnects);
-                        msg = "Status: " + deviceId + " | Temp: " + String(temp_cpu_c) + "C | Heap: " +
-                              String(free_heap_b) + "B | RSSI: " + String(wifi_rssi_dbm) + "dBm | Uptime: " +
-                              String(uptime_ms/1000) + "s | Reconexoes: " + String(reconnects);
-                    }
-
-                    if (!alertPending) {
-                        pendingAlertType = "HEARTBEAT";
-                        pendingAlertMessage = msg;
-                        alertPending = true;
-                    }
+                    StaticJsonDocument<256> out;
+                    out["type"] = "DEVICE_STATUS";
+                    out["deviceId"] = deviceId;
+                    out["status"] = "online";
+                    if (tensao_mV >= 0) out["batteryMv"] = tensao_mV;
+                    out["uptimeSec"] = (long)(uptime_ms / 1000);
+                    out["reconnects"] = reconnects;
+                    if (wifi_rssi_dbm != 0) out["rssiDbm"] = wifi_rssi_dbm;
+                    if (free_heap_b != 0) out["heapB"] = free_heap_b;
+                    if (temp_cpu_c != 0.0f) out["tempCpuC"] = temp_cpu_c;
+                    String jsonOut; serializeJson(out, jsonOut); ws.textAll(jsonOut);
                 }
-                // << NOVO BLOCO PARA O CANAL DE BROADCAST DO SISTEMA >>
+                else if (strcmp(type_msg, "DEVICE_STATUS") == 0) {
+                    // Cliente envia diretamente no formato consumido pelo app.
+                    // Garante o deviceId mapeado e repassa campos esperados.
+                    StaticJsonDocument<256> out;
+                    out["type"] = "DEVICE_STATUS";
+                    out["deviceId"] = deviceId; // sempre o mapeado
+                    const char* status = doc["status"] | "online";
+                    out["status"] = status;
+                    if (doc.containsKey("batteryMv")) out["batteryMv"] = (int)doc["batteryMv"];
+                    if (doc.containsKey("uptimeSec")) out["uptimeSec"] = (long)doc["uptimeSec"];
+                    if (doc.containsKey("reconnects")) out["reconnects"] = (int)doc["reconnects"];
+                    if (doc.containsKey("rssiDbm")) out["rssiDbm"] = (int)doc["rssiDbm"];
+                    if (doc.containsKey("heapB")) out["heapB"] = (long)doc["heapB"];
+                    if (doc.containsKey("tempCpuC")) out["tempCpuC"] = (float)doc["tempCpuC"];
+                    String jsonOut; serializeJson(out, jsonOut); ws.textAll(jsonOut);
+                }
                 else if (strcmp(type_msg, "SYSTEM_BROADCAST") == 0) {
-                    String jsonBroadcast = (char*)data;
-                    ws.textAll(jsonBroadcast);
-                    Serial.println(">>> Retransmitindo SYSTEM_BROADCAST: " + jsonBroadcast);
+                    // Se vier um DEVICE_STATUS do cliente, converte em um evento DEVICE_STATUS normalizado
+                    JsonObject dataObj = doc["data"];
+                    const char* btype = dataObj["broadcast_type"] | "";
+                    if (strcmp(btype, "DEVICE_STATUS") == 0) {
+                        JsonObject sd = dataObj["status_data"];
+                        int tensao_mV = sd["tensao_mV"] | -1;
+                        long uptime_ms = sd["uptime_ms"] | 0L;
+                        int reconnects = sd["reconnects"] | 0;
+
+                        StaticJsonDocument<200> out;
+                        out["type"] = "DEVICE_STATUS";
+                        out["deviceId"] = deviceId;
+                        out["status"] = "online";
+                        if (tensao_mV >= 0) out["batteryMv"] = tensao_mV;
+                        out["uptimeSec"] = (long)(uptime_ms / 1000);
+                        out["reconnects"] = reconnects;
+                        String jsonOut; serializeJson(out, jsonOut); ws.textAll(jsonOut);
+                    } else {
+                        String jsonBroadcast = (char*)data;
+                        ws.textAll(jsonBroadcast);
+                    }
                 }
             }
         }
@@ -327,7 +355,6 @@ void broadcastFallAlert(String local, String dispositivo) {
     ws.textAll(json);
     Serial.printf("\n>>> BROADCAST DE QUEDA (Padronizado): Local=[%s], Dispositivo=[%s] <<<\n", local.c_str(), dispositivo.c_str());
     
-    // Enviar alerta para o backend na Vercel
     enviarAlertaVercel("QUEDA", local, dispositivo);
 }
 
@@ -341,13 +368,49 @@ void broadcastPanicAlert(String dispositivo) {
     ws.textAll(json);
     Serial.printf("\n>>> BROADCAST DE PÂNICO (Padronizado): Dispositivo=[%s] <<<\n", dispositivo.c_str());
     
-    // Enviar alerta para o backend na Vercel
     enviarAlertaVercel("PANICO", "", dispositivo);
 }
 
+// =========================================================================
+// INÍCIO DAS NOVAS FUNÇÕES (v23): Broadcast de Gás/Fumaça
+// =========================================================================
+void broadcastGasAlert(String local, String dispositivo) {
+    StaticJsonDocument<200> doc;
+    doc["type"] = "ALERTA";
+    doc["sub_type"] = "GAS";
+    doc["dispositivo"] = dispositivo;
+    JsonObject detalhes = doc.createNestedObject("detalhes");
+    detalhes["local"] = local;
+    String json;
+    serializeJson(doc, json);
+    ws.textAll(json);
+    Serial.printf("\n>>> BROADCAST DE GAS (Padronizado): Local=[%s], Dispositivo=[%s] <<<\n", local.c_str(), dispositivo.c_str());
+    
+    enviarAlertaVercel("GAS", local, dispositivo);
+}
+
+void broadcastSmokeAlert(String local, String dispositivo) {
+    StaticJsonDocument<200> doc;
+    doc["type"] = "ALERTA";
+    doc["sub_type"] = "FUMACA";
+    doc["dispositivo"] = dispositivo;
+    JsonObject detalhes = doc.createNestedObject("detalhes");
+    detalhes["local"] = local;
+    String json;
+    serializeJson(doc, json);
+    ws.textAll(json);
+    Serial.printf("\n>>> BROADCAST DE FUMACA (Padronizado): Local=[%s], Dispositivo=[%s] <<<\n", local.c_str(), dispositivo.c_str());
+    
+    enviarAlertaVercel("FUMACA", local, dispositivo);
+}
+// =========================================================================
+// FIM DAS NOVAS FUNÇÕES
+// =========================================================================
+
+
 bool acknowledgeLatestAlert(String user) {
     sqlite3_stmt *stmt;
-    const char *sql = "UPDATE alerts SET acknowledged_by = ?, acknowledged_at = ? WHERE id = (SELECT id FROM alerts WHERE (alert_type LIKE '%FUMACA%' OR alert_type LIKE '%GAS%') AND acknowledged_by IS NULL ORDER BY id DESC LIMIT 1);";
+    const char *sql = "UPDATE alerts SET acknowledged_by = ?, acknowledged_at = ? WHERE id = (SELECT id FROM alerts WHERE (alert_type LIKE '%FUMACA%' OR alert_type LIKE '%GAS%' OR alert_type LIKE '%QUEDA%' OR alert_type LIKE '%PANICO%') AND acknowledged_by IS NULL ORDER BY id DESC LIMIT 1);";
     if (sqlite3_prepare_v2(db, sql, -1, &stmt, NULL) != SQLITE_OK) return false;
     String timestamp = getFormattedTime();
     sqlite3_bind_text(stmt, 1, user.c_str(), -1, SQLITE_TRANSIENT);
@@ -382,66 +445,52 @@ void handleAlertLogging() {
     }
 }
 
+void handleBroadcasts() {
+    if (g_broadcastPending) {
+        Serial.println(">>> Retransmitindo SYSTEM_BROADCAST (do loop): " + g_broadcastMessage);
+        ws.textAll(g_broadcastMessage);
+        
+        // Limpa a fila
+        g_broadcastMessage = ""; 
+        g_broadcastPending = false;
+    }
+}
+
 void enviarPing() {
     if (millis() - ultimoPing > 10000) {
-        ws.textAll("{\"type\":\"ping\"}");
+        //Serial.println(">>> Enviando PING de dados (string)...");
+        // Envia um frame de DADOS (string)
+        ws.textAll("{\"type\":\"ping\"}"); 
         ultimoPing = millis();
     }
 }
 
-void verificarSensor() {
-    int sensorValue = analogRead(MQ2_PIN);
-    // Valores de threshold para detecção de gás/fumaça
-    if (sensorValue > 1000) { // Ajuste este valor conforme a sensibilidade desejada
-        String novoEstado = "Alerta: ";
-        String tipoAlerta;
-        
-        // Determinar se é gás ou fumaça com base no valor do sensor
-        if (sensorValue > 2000) {
-            novoEstado += "Gás Detectado";
-            tipoAlerta = "GAS";
-        } else {
-            novoEstado += "Fumaça Detectada";
-            tipoAlerta = "FUMACA";
-        }
-        
-        // Só envia alerta se o estado mudou
-        if (novoEstado != ultimoEstadoSensor) {
-            ultimoEstadoSensor = novoEstado;
-            enviarEstadoSensor(novoEstado);
-            
-            // Registra o alerta no banco de dados local
-            logAlert(tipoAlerta.c_str(), novoEstado.c_str());
-            
-            // Envia o alerta para o backend na Vercel
-            enviarAlertaVercel(tipoAlerta, "", "");
-        }
-    } else if (ultimoEstadoSensor != "Ambiente Seguro") {
-        ultimoEstadoSensor = "Ambiente Seguro";
-        enviarEstadoSensor(ultimoEstadoSensor);
-    }
-}
-
-// Função para enviar alertas para o backend na Vercel (VERSÃO POST COM JSON)
 void enviarAlertaVercel(String tipoAlerta, String local, String dispositivo) {
     HTTPClient http;
-
-    // ***** ALTERAÇÃO 1 DE 2: Mude para WiFiClientSecure *****
-    // Isso é necessário para conexões seguras (https)
     WiFiClientSecure client; 
     
     bool success = false;
     int attempts = 0;
     const int maxAttempts = 3;
     
-    // 1. O servidor espera "type" e "message". Vamos criar a mensagem.
     String mensagem;
     if (tipoAlerta == "QUEDA") {
         mensagem = "Queda detectada em " + local + ". Dispositivo: " + dispositivo;
     } else if (tipoAlerta == "PANICO") {
         mensagem = "Botão de pânico acionado. Dispositivo: " + dispositivo;
-    } else { // GAS, FUMACA, etc.
-        mensagem = "Alerta de " + tipoAlerta + " detectado no servidor local (MQ2).";
+    // =========================================================================
+    // INÍCIO DA ADIÇÃO (v23): Mensagens de Alerta de Gás/Fumaça
+    // =========================================================================
+    } else if (tipoAlerta == "GAS") {
+        mensagem = "Alerta de GAS detectado em " + local + ". Dispositivo: " + dispositivo;
+    } else if (tipoAlerta == "FUMACA") {
+        mensagem = "Alerta de FUMACA detectado em " + local + ". Dispositivo: " + dispositivo;
+    // =========================================================================
+    // FIM DA ADIÇÃO
+    // =========================================================================
+    } else { 
+        // Mensagem genérica (sem "MQ2")
+        mensagem = "Alerta de " + tipoAlerta + " detectado. Dispositivo: " + dispositivo;
     }
 
     while (!success && attempts < maxAttempts) { 
@@ -457,23 +506,15 @@ void enviarAlertaVercel(String tipoAlerta, String local, String dispositivo) {
         Serial.print("Payload: ");
         Serial.println(jsonPayload);
 
-        // ***** ALTERAÇÃO 2 DE 2: Adicione esta linha *****
-        // Pula a validação do certificado SSL para conexões https
         client.setInsecure(); 
-
-        // 3. Iniciar requisição
         http.begin(client, vercelServerUrl);
-        
-        // Diz à biblioteca para SEGUIR o redirecionamento 308 automaticamente
         http.setFollowRedirects(HTTPC_STRICT_FOLLOW_REDIRECTS);
         
-        // 4. Adicionar os cabeçalhos (Headers) OBRIGATÓRIOS
         http.addHeader("Content-Type", "application/json");
         http.addHeader("X-API-Key", myApiKey); 
         http.addHeader("User-Agent", "PostmanRuntime/7.26.8");
         http.addHeader("Accept", "*/*");
         
-        // 5. Mudar de GET para POST e enviar o payload
         int httpResponseCode = http.POST(jsonPayload);
         
         if (httpResponseCode > 0) { 
@@ -482,11 +523,10 @@ void enviarAlertaVercel(String tipoAlerta, String local, String dispositivo) {
             Serial.println(httpResponseCode); 
             Serial.println(response);
 
-            // SUCESSO é 200 OK.
             if (httpResponseCode == 200) {
                 success = true;
             } else {
-                attempts++; // Qualquer outra coisa (308, 400, 500) é uma falha
+                attempts++; 
             }
             
         } else {
@@ -506,7 +546,6 @@ void enviarAlertaVercel(String tipoAlerta, String local, String dispositivo) {
 }
 
 
-// Função auxiliar para codificar URL
 String urlEncode(String str) {
     String encodedString = "";
     char c;
@@ -536,37 +575,32 @@ String urlEncode(String str) {
     return encodedString;
 }
 
-// Função para testar a conexão com o servidor em nuvem
 bool testCloudConnection() {
     if (WiFi.status() != WL_CONNECTED) {
         Serial.println("WiFi desconectado. Não é possível testar conexão com servidor.");
         return false;
     }
     
-    // ***** CORREÇÃO AQUI TAMBÉM *****
     WiFiClientSecure client;
     HTTPClient http;
     
-    // Envia uma requisição de teste para o servidor
-    // A URL de teste deve ser a /api/ (rota GET) e não /api/alert (rota POST)
-    String testUrl = String(vercelServerUrl); // Pega a base "https://.../api/alert"
-    testUrl.replace("/api/alert", "/api/");   // Substitui para ficar ".../api/"
+    String testUrl = String(vercelServerUrl); 
+    testUrl.replace("/api/alert", "/api/");   
     
     Serial.print("Testando conexão com servidor (rota GET /api/): ");
     Serial.println(testUrl);
     
-    // ***** E ADICIONE ESTA LINHA *****
     client.setInsecure();
 
     http.begin(client, testUrl);
     http.setTimeout(5000); // Timeout de 5 segundos
     int httpResponseCode = http.GET();
-    bool success = (httpResponseCode == 200); // Sucesso aqui é 200 OK
+    bool success = (httpResponseCode == 200); 
     
     if (success) {
         Serial.print("Conexão com servidor bem-sucedida. Código: ");
         Serial.println(httpResponseCode);
-        String response = http.getString(); // Pega a resposta ("Backend... V_LIMPA")
+        String response = http.getString(); 
         Serial.println("Resposta: " + response);
         resetFailedConnectionCounter();
     } else {
@@ -585,7 +619,6 @@ bool testCloudConnection() {
     return success;
 }
 
-// Função para resetar o contador de falhas de conexão
 void resetFailedConnectionCounter() {
     if (failedCloudConnections > 0) {
         failedCloudConnections = 0;
@@ -608,6 +641,8 @@ bool copyFile(const char* srcPath, const char* destPath) {
     size_t bytesRead;
     while ((bytesRead = srcFile.read(buf, sizeof(buf))) > 0) {
         destFile.write(buf, bytesRead);
+        
+        esp_task_wdt_reset();
     }
     srcFile.close();
     destFile.close();
@@ -635,6 +670,8 @@ void handleBackup() {
 }
 
 void initDatabase() {
+    Serial.println("Inicializando banco de dados...");
+    
     bool create_new_db = false;
     if (sqlite3_open(db_path, &db) != SQLITE_OK) {
         sqlite3_close(db);
@@ -643,11 +680,20 @@ void initDatabase() {
         } else create_new_db = true;
     }
     if (create_new_db) { SD.remove(db_path); sqlite3_open(db_path, &db); }
+    
+    const char* sql_devices = "CREATE TABLE IF NOT EXISTS devices (device_id TEXT PRIMARY KEY, device_type TEXT NOT NULL);";
+    if (db_exec(db, sql_devices) != SQLITE_OK) {
+        Serial.println("ERRO: Falha ao criar tabela devices.");
+        return;
+    }
+    Serial.println("Tabela 'devices' verificada/criada.");
+    
     db_exec(db, "CREATE TABLE IF NOT EXISTS alerts (id INTEGER PRIMARY KEY AUTOINCREMENT, timestamp TEXT NOT NULL, alert_type TEXT NOT NULL, message TEXT NOT NULL, acknowledged_by TEXT, acknowledged_at TEXT);");
     db_exec(db, "CREATE TABLE IF NOT EXISTS users (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL, email TEXT UNIQUE NOT NULL, password TEXT NOT NULL);");
     if (db_exec(db, "CREATE TABLE IF NOT EXISTS elderly_data (id INTEGER PRIMARY KEY CHECK (id = 1), name TEXT, age INTEGER, family_contact_name TEXT, family_contact_phone TEXT, observations TEXT);") == SQLITE_OK) {
         db_exec(db, "INSERT OR IGNORE INTO elderly_data (id) VALUES (1);");
     }
+    
     if (create_new_db) { sqlite3_close(db); copyFile(db_path, db_backup_path); sqlite3_open(db_path, &db); last_backup_time = millis(); }
     Serial.println("Banco de dados e tabelas prontos.");
 }
@@ -921,17 +967,6 @@ void setupWebSocket() {
     server.addHandler(&ws);
 }
 
-void enviarEstadoSensor(String estado) {
-    int valor = analogRead(MQ2_PIN);
-    StaticJsonDocument<200> doc;
-    doc["type"] = "sensor";
-    doc["tipo"] = estado;
-    doc["valor"] = valor;
-    String json;
-    serializeJson(doc, json);
-    ws.textAll(json);
-}
-
 void WiFiEvent(WiFiEvent_t event, WiFiEventInfo_t info) {
     if (event == ARDUINO_EVENT_WIFI_STA_DISCONNECTED) {
         if (!alertPending) { pendingAlertType = "WIFI"; pendingAlertMessage = "Conexao Wi-Fi perdida."; alertPending = true; }
@@ -944,4 +979,158 @@ String getFormattedTime() {
     char timeString[50];
     strftime(timeString, sizeof(timeString), "%Y-%m-%d %H:%M:%S", &timeinfo);
     return String(timeString);
+}
+
+// --- Funções de Gerenciamento de Dispositivos (HTTP) ---
+
+struct DeviceInfo {
+    String deviceId;
+    String deviceType;
+};
+
+static int selectDevicesCallback(void *data, int argc, char **argv, char **azColName) {
+    JsonArray* devicesArray = (JsonArray*)data;
+    JsonObject device = devicesArray->createNestedObject();
+    
+    for(int i = 0; i < argc; i++) {
+        if (strcmp(azColName[i], "device_id") == 0) {
+            device["deviceId"] = argv[i] ? argv[i] : "";
+        } else if (strcmp(azColName[i], "device_type") == 0) {
+            device["deviceType"] = argv[i] ? argv[i] : "";
+        }
+    }
+    return 0;
+}
+
+void handleDevicesGet(AsyncWebServerRequest *request) {
+    DynamicJsonDocument doc(1024);
+    JsonArray devicesArray = doc.to<JsonArray>();
+
+    const char* sql = "SELECT device_id, device_type FROM devices;";
+    
+    char *zErrMsg = 0;
+    int rc = sqlite3_exec(db, sql, selectDevicesCallback, &devicesArray, &zErrMsg);
+    
+    if (rc != SQLITE_OK) {
+        Serial.printf("SQL error in GET /devices: %s\n", zErrMsg);
+        sqlite3_free(zErrMsg);
+        request->send(500, "application/json", "{\"status\":\"error\", \"message\":\"Database error\"}");
+        return;
+    }
+    
+    String responseJson;
+    serializeJson(devicesArray, responseJson);
+    
+    request->send(200, "application/json", responseJson);
+    Serial.printf("GET /devices respondido com %d dispositivos.\n", devicesArray.size());
+}
+
+// =========================================================================
+// INÍCIO DA CORREÇÃO: Lógica UPSERT Manual
+// (Previne o crash "parser stack overflow" do ON CONFLICT)
+// =========================================================================
+void handleDevicesSet(AsyncWebServerRequest *request) {
+    if (request->hasParam("deviceId", true) && request->hasParam("type", true)) {
+        String deviceId = request->getParam("deviceId", true)->value();
+        String deviceType = request->getParam("type", true)->value();
+
+        sqlite3_stmt *stmt;
+        int rc;
+
+        // --- ETAPA 1: Tentar ATUALIZAR (UPDATE) primeiro ---
+        const char* sql_update = "UPDATE devices SET device_type = ? WHERE device_id = ?;";
+        rc = sqlite3_prepare_v2(db, sql_update, -1, &stmt, 0);
+        
+        if (rc != SQLITE_OK) {
+            Serial.printf("SQL error (prepare update) in POST /devices/set: %s\n", sqlite3_errmsg(db));
+            request->send(500, "application/json", "{\"status\":\"error\", \"message\":\"Database prepare error (update)\"}");
+            return;
+        }
+
+        sqlite3_bind_text(stmt, 1, deviceType.c_str(), -1, SQLITE_STATIC);
+        sqlite3_bind_text(stmt, 2, deviceId.c_str(), -1, SQLITE_STATIC);
+
+        rc = sqlite3_step(stmt);
+        sqlite3_finalize(stmt); // Finaliza o statement de update
+
+        if (rc != SQLITE_DONE) {
+            Serial.printf("SQL error (execute update) in POST /devices/set: %s\n", sqlite3_errmsg(db));
+            request->send(500, "application/json", "{\"status\":\"error\", \"message\":\"Database execute error (update)\"}");
+            return;
+        }
+
+        // --- ETAPA 2: Verificar se algo foi atualizado. Se não, INSERIR (INSERT) ---
+        if (sqlite3_changes(db) == 0) {
+            // Nenhuma linha foi atualizada, então o deviceId não existe. Vamos inserir.
+            Serial.printf("Device '%s' nao encontrado. Inserindo...\n", deviceId.c_str());
+            
+            const char* sql_insert = "INSERT INTO devices (device_id, device_type) VALUES (?, ?);";
+            rc = sqlite3_prepare_v2(db, sql_insert, -1, &stmt, 0);
+
+            if (rc != SQLITE_OK) {
+                Serial.printf("SQL error (prepare insert) in POST /devices/set: %s\n", sqlite3_errmsg(db));
+                request->send(500, "application/json", "{\"status\":\"error\", \"message\":\"Database prepare error (insert)\"}");
+                return;
+            }
+
+            sqlite3_bind_text(stmt, 1, deviceId.c_str(), -1, SQLITE_STATIC);
+            sqlite3_bind_text(stmt, 2, deviceType.c_str(), -1, SQLITE_STATIC);
+
+            rc = sqlite3_step(stmt);
+            sqlite3_finalize(stmt); // Finaliza o statement de insert
+
+            if (rc != SQLITE_DONE) {
+                Serial.printf("SQL error (execute insert) in POST /devices/set: %s\n", sqlite3_errmsg(db));
+                request->send(500, "application/json", "{\"status\":\"error\", \"message\":\"Database execute error (insert)\"}");
+                return;
+            }
+            Serial.printf("POST /devices/set: Novo device '%s' set to type '%s'.\n", deviceId.c_str(), deviceType.c_str());
+        } else {
+             Serial.printf("POST /devices/set: Device '%s' atualizado para o tipo '%s'.\n", deviceId.c_str(), deviceType.c_str());
+        }
+
+        request->send(200, "application/json", "{\"status\":\"success\"}");
+
+    } else {
+        request->send(400, "application/json", "{\"status\":\"error\", \"message\":\"Missing deviceId or type parameter\"}");
+    }
+}
+// =========================================================================
+// FIM DA CORREÇÃO
+// =========================================================================
+
+void handleDevicesDelete(AsyncWebServerRequest *request) {
+    if (request->hasParam("deviceId", true)) {
+        String deviceId = request->getParam("deviceId", true)->value();
+
+        // 1. Prepara a declaração SQL com placeholder
+        const char* sql = "DELETE FROM devices WHERE device_id = ?;";
+        
+        sqlite3_stmt *stmt;
+        int rc = sqlite3_prepare_v2(db, sql, -1, &stmt, 0);
+
+        if (rc != SQLITE_OK) {
+            Serial.printf("SQL error (prepare) in POST /devices/delete: %s\n", sqlite3_errmsg(db));
+            request->send(500, "application/json", "{\"status\":\"error\", \"message\":\"Database prepare error\"}");
+            return;
+        }
+
+        // 2. Vincula o valor
+        sqlite3_bind_text(stmt, 1, deviceId.c_str(), -1, SQLITE_STATIC);
+
+        // 3. Executa a declaração
+        rc = sqlite3_step(stmt);
+        sqlite3_finalize(stmt); // Libera o statement
+
+        if (rc != SQLITE_DONE) {
+            Serial.printf("SQL error (execute) in POST /devices/delete: %s\n", sqlite3_errmsg(db));
+            request->send(500, "application/json", "{\"status\":\"error\", \"message\":\"Database execute error\"}");
+            return;
+        }
+
+        Serial.printf("POST /devices/delete: Device '%s' deleted.\n", deviceId.c_str());
+        request->send(200, "application/json", "{\"status\":\"success\"}");
+    } else {
+        request->send(400, "application/json", "{\"status\":\"error\", \"message\":\"Missing deviceId parameter\"}");
+    }
 }

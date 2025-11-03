@@ -1,10 +1,10 @@
 import { View, Text, StyleSheet, StatusBar, TouchableOpacity, ScrollView } from 'react-native';
-import { useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useAlerts } from './AlertsContext';
 import DeviceTypeSelector from './DeviceTypeSelector';
 
 export default function CategoryDevicesScreen({ route, navigation }) {
-  const { categoryTitle, categoryIcon, categoryKey } = route.params;
+  const { categoryTitle, categoryIcon, categoryKey, focusDeviceId } = route.params || {};
   
   const {
     deviceTypes,
@@ -17,7 +17,8 @@ export default function CategoryDevicesScreen({ route, navigation }) {
   // Busca os dispositivos em tempo real do contexto
   const getCategoryDevices = () => {
     if (categoryKey === 'sensores') {
-      return getDevicesByType('gas_fumaca');
+      // Remove o dispositivo virtual legado, caso exista
+      return getDevicesByType('gas_fumaca').filter(d => d.deviceId !== 'SENSOR_GAS_FUMACA');
     } else if (categoryKey === 'pulseira') {
       return getDevicesByType('pulseira');
     } else if (categoryKey === 'detector') {
@@ -27,6 +28,18 @@ export default function CategoryDevicesScreen({ route, navigation }) {
   };
 
   const categoryDevices = getCategoryDevices();
+
+  // Scroll para o dispositivo focado ao abrir via notificação
+  const scrollRef = useRef(null);
+  useEffect(() => {
+    if (!focusDeviceId || !scrollRef.current) return;
+    const idx = categoryDevices.findIndex(d => d.deviceId === focusDeviceId);
+    if (idx >= 0) {
+      const estimatedItemHeight = 140; // altura aproximada por card
+      const y = Math.max(0, idx * estimatedItemHeight);
+      scrollRef.current.scrollTo({ y, animated: true });
+    }
+  }, [focusDeviceId, categoryDevices]);
 
   const [typeSelectorVisible, setTypeSelectorVisible] = useState(false);
   const [selectedDeviceId, setSelectedDeviceId] = useState(null);
@@ -91,7 +104,7 @@ export default function CategoryDevicesScreen({ route, navigation }) {
         key={device.deviceId} 
         style={[styles.deviceCard, alertStyle]}
         onPress={isAlertActive ? () => acknowledgeAlert(device.deviceId, device.lastAlertType) : undefined}
-        activeOpacity={isAlertActive ? 0.7 : 1}
+        activeOpacity={0.8}
       >
         <View style={styles.deviceHeader}>
           <Text style={styles.deviceTitle} numberOfLines={1} ellipsizeMode="tail">
@@ -107,6 +120,7 @@ export default function CategoryDevicesScreen({ route, navigation }) {
                 ]}
                 onPress={() => !isAlertActive && showTypeSelector(device.deviceId)}
                 disabled={isAlertActive}
+                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
               >
                 <Text style={styles.typeButtonText}>{typeConfig.name}</Text>
               </TouchableOpacity>
@@ -115,6 +129,7 @@ export default function CategoryDevicesScreen({ route, navigation }) {
                   style={[styles.removeButton, isAlertActive && styles.buttonDisabled]}
                   onPress={() => !isAlertActive && handleRemoveType(device.deviceId)}
                   disabled={isAlertActive}
+                  hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
                 >
                   <Text style={styles.removeButtonText}>Remover Tipo</Text>
                 </TouchableOpacity>
@@ -128,10 +143,18 @@ export default function CategoryDevicesScreen({ route, navigation }) {
             <Text style={[styles.sensorStateText, { color: getColorForSensorState(sensorState) }]}>
               {sensorState || 'Indisponível'}
             </Text>
+            {typeof device.lastSeen === 'number' && device.lastSeen > 0 && (
+              <Text style={[styles.sensorStateLabel, { marginTop: 8 }]}>Atualizado há {Math.max(0, Math.floor((Date.now() - device.lastSeen)/1000))}s</Text>
+            )}
           </View>
         ) : (
           <Text style={[styles.deviceStatus, { color: alertStatusColor }]}>
             {alertStatusText}
+          </Text>
+        )}
+        {!isSensorDevice && isAlertActive && !!device.lastAlertAt && (
+          <Text style={styles.deviceInfoText}>
+            Notificado: {new Date(device.lastAlertAt).toLocaleString()}
           </Text>
         )}
         {device.connected && !isSensorDevice && (
@@ -158,6 +181,11 @@ export default function CategoryDevicesScreen({ route, navigation }) {
             {device.reconnects !== undefined && (
               <Text style={styles.deviceInfoText}>Reconexões: {device.reconnects}</Text>
             )}
+            {typeof device.lastSeen === 'number' && device.lastSeen > 0 && (
+              <Text style={styles.deviceInfoText}>
+                Atualizado há {Math.max(0, Math.floor((Date.now() - device.lastSeen)/1000))}s
+              </Text>
+            )}
           </View>
         )}
         {isAlertActive && (
@@ -172,6 +200,7 @@ export default function CategoryDevicesScreen({ route, navigation }) {
       <StatusBar barStyle="light-content" />
       
       <ScrollView 
+        ref={scrollRef}
         style={styles.scrollView}
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
@@ -205,7 +234,7 @@ export default function CategoryDevicesScreen({ route, navigation }) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#7a8a99',
+    backgroundColor: '#0b1220',
   },
   scrollView: {
     flex: 1,

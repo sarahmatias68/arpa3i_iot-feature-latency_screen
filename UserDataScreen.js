@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, TextInput, StyleSheet, TouchableOpacity, Alert, ScrollView, KeyboardAvoidingView, Platform } from 'react-native';
 
-const API_URL = 'http://192.168.1.7:86';
+const API_URL = 'http://192.168.2.115:86';
 
 const UserDataScreen = ({ user }) => {
   const [name, setName] = useState('');
@@ -84,11 +84,11 @@ const UserDataScreen = ({ user }) => {
 const styles = StyleSheet.create({
   keyboardContainer: {
     flex: 1,
-    backgroundColor: '#7a8a99',
+    backgroundColor: '#0b1220',
   },
   container: {
     flexGrow: 1,
-    backgroundColor: '#7a8a99',
+    backgroundColor: '#0b1220',
     padding: 20,
   },
   title: {
@@ -101,9 +101,9 @@ const styles = StyleSheet.create({
   },
   label: {
     fontSize: 16,
-    color: '#fff',
-    fontWeight: 'bold',
-    marginBottom: 5,
+    color: '#e5e7eb',
+    fontWeight: '600',
+    marginBottom: 8,
     alignSelf: 'flex-start',
   },
   input: {
@@ -131,7 +131,7 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
   },
   infoText: {
-    color: '#fff',
+    color: '#e5e7eb',
     fontSize: 14,
     textAlign: 'center',
     marginBottom: 20,

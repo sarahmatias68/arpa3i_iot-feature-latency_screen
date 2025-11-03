@@ -1,5 +1,6 @@
 import React, { useMemo, useState } from 'react';
-import { View, Text, TextInput, TouchableOpacity, FlatList, StyleSheet } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, FlatList, StyleSheet, Alert } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { useAlerts } from './AlertsContext';
 import DeviceTypeSelector from './DeviceTypeSelector';
 
@@ -9,6 +10,7 @@ const DeviceRegistryScreen = () => {
     deviceTypes,
     updateDeviceType,
     requestSystemBroadcast,
+    removeDevice,
   } = useAlerts();
 
   const [selectorVisible, setSelectorVisible] = useState(false);
@@ -56,6 +58,21 @@ const DeviceRegistryScreen = () => {
       </TouchableOpacity>
       <TouchableOpacity style={[styles.smallButton, { backgroundColor: '#ef4444' }]} onPress={() => handleClearType(item.deviceId)}>
         <Text style={styles.smallButtonText}>Limpar Tipo</Text>
+      </TouchableOpacity>
+      <TouchableOpacity
+        style={[styles.iconButton, !item.connected && styles.iconButtonDanger]}
+        onPress={() => {
+          if (item.connected) {
+            Alert.alert('Não permitido', 'Só é possível excluir dispositivos offline.');
+            return;
+          }
+          Alert.alert('Excluir dispositivo', `Deseja remover '${item.deviceId}' da lista?`, [
+            { text: 'Cancelar', style: 'cancel' },
+            { text: 'Excluir', style: 'destructive', onPress: () => removeDevice(item.deviceId) },
+          ]);
+        }}
+      >
+        <Ionicons name="trash-outline" size={20} color={item.connected ? '#6b7280' : '#ef4444'} />
       </TouchableOpacity>
     </View>
   );
@@ -121,6 +138,8 @@ const styles = StyleSheet.create({
   meta: { color: '#9ca3af' },
   smallButton: { backgroundColor: '#374151', paddingVertical: 8, paddingHorizontal: 12, borderRadius: 8, marginLeft: 8 },
   smallButtonText: { color: '#f9fafb', fontWeight: '600' },
+  iconButton: { marginLeft: 8, padding: 8, borderRadius: 8, backgroundColor: '#1f2937', borderWidth: 1, borderColor: '#374151' },
+  iconButtonDanger: { backgroundColor: '#111827' },
 });
 
 export default DeviceRegistryScreen;

@@ -1,12 +1,13 @@
 import { useEffect } from 'react';
 import { useNavigation } from '@react-navigation/native';
 import * as Notifications from 'expo-notifications';
-import { getMessaging, onMessage, onNotificationOpenedApp, getInitialNotification } from '@react-native-firebase/messaging';
+import { getMessaging, onMessage } from '@react-native-firebase/messaging';
 import { useAlerts } from './AlertsContext';
 
 export default function NotificationHandler({ isAuthenticated }) {
   const navigation = useNavigation();
   const { devicesById } = useAlerts();
+  const SERVER_HTTP_BASE = "http://192.168.2.115:86";
 
   useEffect(() => {
     if (!isAuthenticated) return;
@@ -18,14 +19,19 @@ export default function NotificationHandler({ isAuthenticated }) {
       const deviceId = data.deviceId || data.dispositivo || data.id || data.device_id;
       const rawType = data.alertType || data.alert_type || data.sub_type || data.type;
       const alertType = (rawType || '').toUpperCase() === 'QUEDA' ? 'QUEDA' : 'PANICO';
-      return { deviceId, alertType };
+      const ts = data.timestamp || data.ts || remoteMessage?.sentTime || Date.now();
+      return { deviceId, alertType, ts };
     };
 
     const foregroundUnsub = onMessage(messaging, async (remoteMessage) => {
+      const { ts } = extractPayload(remoteMessage);
+      const when = new Date(Number(ts) || Date.now()).toLocaleString();
+      const baseTitle = remoteMessage.notification?.title || 'Novo Alerta';
+      const baseBody = remoteMessage.notification?.body || '';
       await Notifications.scheduleNotificationAsync({
         content: {
-          title: remoteMessage.notification?.title || 'Novo Alerta',
-          body: remoteMessage.notification?.body || '',
+          title: `${baseTitle}`,
+          body: baseBody ? `${baseBody} • ${when}` : `${when}`,
           data: remoteMessage.data,
         },
         trigger: null,
@@ -39,44 +45,53 @@ export default function NotificationHandler({ isAuthenticated }) {
         navigation.navigate('Main');
         return;
       }
-      // Apenas navega. Estado do alerta deve vir do WebSocket/AsyncStorage.
-      const dev = devicesById[deviceId];
-      if (dev?.deviceType === 'gas_fumaca') {
+      // Garante tipo via servidor se ainda não carregou no contexto (app frio)
+      let dev = devicesById[deviceId];
+      let dtype = dev?.deviceType;
+      if (!dtype) {
+        try {
+          const res = await fetch(`${SERVER_HTTP_BASE}/devices`);
+          if (res.ok) {
+            const items = await res.json();
+            const found = items.find(it => it.deviceId === deviceId);
+            dtype = found?.deviceType || dtype;
+          }
+        } catch (_) {}
+      }
+      if (dtype === 'gas_fumaca') {
         navigation.navigate('CategoryDevices', {
           categoryTitle: 'Sensores de Gás e Fumaça',
           categoryIcon: '🛡️',
           categoryKey: 'sensores',
+          focusDeviceId: deviceId,
         });
-      } else if (dev?.deviceType === 'pulseira') {
+      } else if (dtype === 'pulseira') {
         navigation.navigate('CategoryDevices', {
           categoryTitle: 'Pulseiras Assistivas',
           categoryIcon: '⌚',
           categoryKey: 'pulseira',
+          focusDeviceId: deviceId,
         });
-      } else if (dev?.deviceType === 'barreira' || dev?.deviceType === 'microondas' || dev?.deviceType === 'detector') {
+      } else if (dtype === 'barreira' || dtype === 'microondas' || dtype === 'detector') {
         navigation.navigate('CategoryDevices', {
           categoryTitle: 'Detectores de Queda',
           categoryIcon: '📱',
           categoryKey: 'detector',
+          focusDeviceId: deviceId,
         });
       } else {
-        navigation.navigate('Main');
+        // Fallback: abre categoria "Detectores" com foco no device
+        navigation.navigate('CategoryDevices', {
+          categoryTitle: 'Detectores de Queda',
+          categoryIcon: '📱',
+          categoryKey: 'detector',
+          focusDeviceId: deviceId,
+        });
       }
     };
 
-    const backgroundUnsub = onNotificationOpenedApp(messaging, (remoteMessage) => {
-      handleTap(remoteMessage);
-    });
-
-    getInitialNotification(messaging).then((remoteMessage) => {
-      if (remoteMessage) {
-        handleTap(remoteMessage);
-      }
-    });
-
     return () => {
       foregroundUnsub();
-      backgroundUnsub();
     };
   }, [isAuthenticated, devicesById, navigation]);
 

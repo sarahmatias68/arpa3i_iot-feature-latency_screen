@@ -1,7 +1,7 @@
-import { Text, StyleSheet, TouchableOpacity, ScrollView } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 
-const SettingsScreen = ({ navigation, onLogout }) => {
+const SettingsScreen = ({ navigation, onLogout, themeName = 'dark', onChangeTheme }) => {
   const menuItems = [
     { title: 'Dados do Usuário', screen: 'UserData', icon: 'person-circle-outline' },
     { title: 'Dados do Idoso', screen: 'ElderlyData', icon: 'body-outline' },
@@ -11,7 +11,33 @@ const SettingsScreen = ({ navigation, onLogout }) => {
   ];
 
   return (
-    <ScrollView style={styles.container}>
+    <ScrollView style={styles.container} contentContainerStyle={{ paddingBottom: 20 }}>
+      <Text style={styles.sectionTitle}>Tema do Aplicativo</Text>
+      <View style={styles.themeRow}>
+        <TouchableOpacity
+          style={[styles.themeButton, themeName === 'light' && styles.themeButtonActive]}
+          onPress={() => onChangeTheme && onChangeTheme('light')}
+        >
+          <Ionicons name="sunny-outline" size={18} color="#f9fafb" style={{ marginRight: 6 }} />
+          <Text style={styles.themeButtonText}>Claro</Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[styles.themeButton, themeName === 'dark' && styles.themeButtonActive]}
+          onPress={() => onChangeTheme && onChangeTheme('dark')}
+        >
+          <Ionicons name="moon-outline" size={18} color="#f9fafb" style={{ marginRight: 6 }} />
+          <Text style={styles.themeButtonText}>Escuro</Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[styles.themeButton, themeName === 'amoled' && styles.themeButtonActive]}
+          onPress={() => onChangeTheme && onChangeTheme('amoled')}
+        >
+          <Ionicons name="contrast-outline" size={18} color="#f9fafb" style={{ marginRight: 6 }} />
+          <Text style={styles.themeButtonText}>AMOLED</Text>
+        </TouchableOpacity>
+      </View>
+
+      <Text style={styles.sectionTitle}>Configurações</Text>
       {menuItems.map((item, index) => (
         <TouchableOpacity key={index} style={styles.menuItem} onPress={() => navigation.navigate(item.screen)}>
           <Ionicons name={item.icon} size={24} color="#3b82f6" style={styles.icon} />
@@ -30,8 +56,41 @@ const SettingsScreen = ({ navigation, onLogout }) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#7a8a99',
+    backgroundColor: '#0b1220',
     
+  },
+  sectionTitle: {
+    color: '#f9fafb',
+    fontSize: 14,
+    fontWeight: '600',
+    marginTop: 16,
+    marginBottom: 8,
+    paddingHorizontal: 15,
+  },
+  themeRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    paddingHorizontal: 15,
+    marginBottom: 10,
+  },
+  themeButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#1f2937',
+    borderWidth: 1,
+    borderColor: '#374151',
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+  },
+  themeButtonActive: {
+    borderColor: '#3b82f6',
+  },
+  themeButtonText: {
+    color: '#f9fafb',
+    fontSize: 14,
+    fontWeight: '600',
   },
   menuItem: {
     flexDirection: 'row',

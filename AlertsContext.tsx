@@ -88,8 +88,8 @@ interface AlertsContextType {
   alertsQueue: AlertItem[];
 }
 
-const WEBSOCKET_URL = "ws://192.168.1.7:86/ws";
-const SERVER_HTTP_BASE = "http://192.168.1.7:86";
+const WEBSOCKET_URL = "ws://192.168.2.115:86/ws";
+const SERVER_HTTP_BASE = "http://192.168.2.115:86";
 const DEVICE_TIMEOUT_MS = 11 * 60 * 1000; // 11 minutos
 
 const AlertsContext = createContext<AlertsContextType | undefined>(undefined);
@@ -350,6 +350,12 @@ export const AlertsProvider: React.FC<AlertsProviderProps> = ({
                 status: isOnline ? "online" : "offline",
                 connected: isOnline,
                 lastSeen: isOnline ? Date.now() : (prev[deviceId]?.lastSeen || 0),
+                uptimeSec: typeof data.uptimeSec === 'number' ? data.uptimeSec : prev[deviceId]?.uptimeSec,
+                reconnects: typeof data.reconnects === 'number' ? data.reconnects : prev[deviceId]?.reconnects,
+                batteryMv: typeof data.batteryMv === 'number' ? data.batteryMv : prev[deviceId]?.batteryMv,
+                rssiDbm: typeof data.rssiDbm === 'number' ? data.rssiDbm : prev[deviceId]?.rssiDbm,
+                tempCpuC: typeof data.tempCpuC === 'number' ? data.tempCpuC : prev[deviceId]?.tempCpuC,
+                heapB: typeof data.heapB === 'number' ? data.heapB : prev[deviceId]?.heapB,
               }
             }));
           }
@@ -718,7 +724,20 @@ export const AlertsProvider: React.FC<AlertsProviderProps> = ({
   };
 
   const getNewDevices = (): DeviceStatus[] => {
-    return Object.values(devicesById).filter(device => !device.deviceType && device.connected);
+    return Object.values(devicesById).filter(device => {
+      if (device.deviceType) return false; // já tipados não são "novos"
+      if (!device.connected) return false; // requer conexão ativa
+      // Heurística para excluir apps: exigir sinais típicos de hardware (métricas ou alertas)
+      const hasMetrics = (
+        typeof device.batteryMv === 'number' ||
+        typeof device.uptimeSec === 'number' ||
+        typeof device.rssiDbm === 'number' ||
+        typeof device.heapB === 'number' ||
+        typeof device.tempCpuC === 'number'
+      );
+      const hasAlert = !!device.lastAlertType;
+      return hasMetrics || hasAlert;
+    });
   };
 
   const value: AlertsContextType = {
@@ -743,22 +762,6 @@ export const AlertsProvider: React.FC<AlertsProviderProps> = ({
   return (
     <AlertsContext.Provider value={value}>
       {children}
-      {activeAlert && (
-        <View style={styles.alertOverlay}>
-          <View style={styles.alertBox}>
-            <Text style={styles.alertTitle}>{activeAlert.title}</Text>
-            <Text style={styles.alertMessage}>{activeAlert.message}</Text>
-            {!!activeAlert.timestamp && (
-              <Text style={styles.alertTimestamp}>
-                {new Date(activeAlert.timestamp).toLocaleString()}
-              </Text>
-            )}
-            <TouchableOpacity style={styles.alertButton} onPress={dismissActiveAlert}>
-              <Text style={styles.alertButtonText}>OK</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-      )}
     </AlertsContext.Provider>
   );
 };
