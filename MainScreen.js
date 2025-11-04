@@ -173,9 +173,9 @@ export default function MainScreen({ navigation, user, themeName = 'dark' }) {
     return devices.map(device => renderDeviceCard(device));
   };
 
-  const renderCategoryButton = (title, icon, devices, categoryKey, status, prependText) => {
+  const renderCategoryButton = ( title, icon, devices, categoryKey, status, prependText) => {
     // status: { text: string | null, bg: string | null }
-    const bgColor = status?.bg || '#2d3748';
+    const bgColor = status?.bg || theme.colors.card ;
     const statusText = status?.text || null;
 
     return (
@@ -311,10 +311,10 @@ const createStyles = (theme) => StyleSheet.create({
     marginBottom: 5,
   },
   newDevicesSubtitle: {
-    ...typography.small,
+    ...typography.body,
     color: theme.colors.muted,
     marginBottom: 10,
-    fontStyle: 'italic',
+    fontWeight: 'bold',
   },
   categoryContainer: {
     width: '90%',
@@ -448,6 +448,7 @@ const createStyles = (theme) => StyleSheet.create({
   deviceInfoText: {
     ...typography.small,
     color: theme.colors.muted,
+    fontWeight: 'bold',
   },
   cardPanicActive: {
     borderWidth: 2,

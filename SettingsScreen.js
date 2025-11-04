@@ -11,7 +11,7 @@ const SettingsScreen = ({ navigation, onLogout, themeName = 'dark', onChangeThem
     { title: 'Dados do Idoso', screen: 'ElderlyData', icon: 'body-outline' },
     { title: 'Gerenciar Usuários', screen: 'UserList', icon: 'people-outline' },
     { title: 'Dispositivos', screen: 'DeviceRegistry', icon: 'list-outline' },
-    { title: 'Sobre o Aplicativo', screen: 'About', icon: 'information-circle-outline' }
+    { title: 'Sobre o Aplicativo', screen: 'About', icon: 'information-circle-outline' },
   ];
 
   return (

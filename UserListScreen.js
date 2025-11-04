@@ -4,7 +4,7 @@ import { useFocusEffect } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { getTheme, typography } from './theme';
 
-const API_URL = 'http://192.168.1.7:86';
+const API_URL = 'http://192.168.1.8:86';
 
 const UserListScreen = ({ themeName = 'dark' }) => {
   const [users, setUsers] = useState([]);

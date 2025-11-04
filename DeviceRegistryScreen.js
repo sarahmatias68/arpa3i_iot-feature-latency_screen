@@ -75,7 +75,7 @@ const DeviceRegistryScreen = ({ navigation, themeName = 'dark' }) => {
         </View>
         <Text style={styles.meta}>
           Status: <Text style={{ color: item.connected ? theme.colors.success : theme.colors.danger }}>{item.connected ? 'online' : 'offline'}</Text>
-          {item.deviceType ? `  •  Tipo: ${item.deviceType}` : '  •  Tipo: não definido'}
+          {item.deviceType ? `  \nTipo: ${item.deviceType}` : '  \nTipo: não definido'}
         </Text>
       </View>
       <View style={styles.actionsColumn}>
@@ -122,7 +122,7 @@ const createStyles = (theme) => StyleSheet.create({
   itemBody: { flex: 1 },
   itemHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' },
   deviceId: { color: theme.colors.text, marginBottom: 4, ...typography.bodyStrong },
-  meta: { color: theme.colors.muted, ...typography.small },
+  meta: { color: theme.colors.muted, ...typography.small, fontWeight: 'bold', padding:2},
   actionsColumn: { justifyContent: 'space-between', gap: 8 },
   fullButton: { backgroundColor: theme.colors.primary, paddingVertical: 8, paddingHorizontal: 16, borderRadius: 8, alignItems: 'center' },
   fullButtonSecondary: { backgroundColor: theme.colors.border },

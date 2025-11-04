@@ -5,12 +5,12 @@ export const THEMES = {
   light: {
     name: 'light',
     colors: {
-      background: '#f3f4f6',
-      card: '#ffffff',
+      background: '#bdbdbd',
+      card: '#e8e8e8',
       border: '#e5e7eb',
       text: '#111827',
-      textSecondary: '#4b5563',
-      muted: '#9ca3af',
+      textSecondary: '#111827',
+      muted: '#111827',
       primary: '#2563eb',
       danger: '#ef4444',
       warning: '#f59e0b',
@@ -47,7 +47,7 @@ export const typography = {
   h2: { fontSize: 20, fontWeight: 'bold' },
   h3: { fontSize: 18, fontWeight: '700' },
   // Body
-  body: { fontSize: 16, fontWeight: '400' },
+  body: { fontSize: 15, fontWeight: '400' },
   bodyStrong: { fontSize: 16, fontWeight: '600' },
   small: { fontSize: 14, fontWeight: '400' },
   smallStrong: { fontSize: 14, fontWeight: '600' },
