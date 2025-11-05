@@ -15,6 +15,7 @@ export const THEMES = {
       danger: '#ef4444',
       warning: '#f59e0b',
       success: '#10b981',
+      btnColor: '#111827',
       overlay: 'rgba(0,0,0,0.5)'
     }
   },

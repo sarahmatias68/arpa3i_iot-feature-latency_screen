@@ -1,5 +1,6 @@
 import { View, Text, StyleSheet, StatusBar, TouchableOpacity, ScrollView } from 'react-native';
 import { useMemo, useState } from 'react';
+import { Ionicons } from '@expo/vector-icons';
 import { useAlerts } from './AlertsContext';
 import { ConnectionStatusBanner } from './ConnectionStatusBanner';
 import DeviceTypeSelector from './DeviceTypeSelector';
@@ -54,7 +55,7 @@ export default function MainScreen({ navigation, user, themeName = 'dark' }) {
 
   const renderDeviceCard = (device) => {
     const deviceType = deviceTypes.find(t => t.id === device.deviceType);
-    const typeConfig = deviceType || { name: "Sem tipo", color: "#6b7280", icon: "❓" };
+    const typeConfig = deviceType || { name: "Sem tipo", color: "#6b7280" };
     const hasType = !!device.deviceType;
 
     const statusText = device.connected ? 'Online' : 'Offline';
@@ -173,7 +174,7 @@ export default function MainScreen({ navigation, user, themeName = 'dark' }) {
     return devices.map(device => renderDeviceCard(device));
   };
 
-  const renderCategoryButton = ( title, icon, devices, categoryKey, status, prependText) => {
+  const renderCategoryButton = (title, iconName, devices, categoryKey, status, prependText) => {
     // status: { text: string | null, bg: string | null }
     const bgColor = status?.bg || theme.colors.card ;
     const statusText = status?.text || null;
@@ -184,7 +185,7 @@ export default function MainScreen({ navigation, user, themeName = 'dark' }) {
           style={[styles.categoryButton, { backgroundColor: bgColor }]}
           onPress={() => navigation.navigate('CategoryDevices', {
             categoryTitle: title,
-            categoryIcon: icon,
+            categoryIcon: iconName,
             categoryKey: categoryKey,
           })}
           activeOpacity={0.7}
@@ -193,11 +194,13 @@ export default function MainScreen({ navigation, user, themeName = 'dark' }) {
             {prependText && (
               <Text style={styles.categoryStatus}>{prependText}</Text>
             )}
-            <Text style={styles.categoryIcon}>{icon}</Text>
+            <Ionicons
+              name={iconName}
+              size={48}
+              color={theme.colors.primary}
+              style={styles.categoryIcon}
+            />
             <Text style={styles.categoryTitle}>{title}</Text>
-            {devices.length > 0 && (
-              <Text style={styles.categoryCount}>({devices.length})</Text>
-            )}
             {statusText && (
               <Text style={styles.categoryStatus}>{statusText}</Text>
             )}
@@ -219,7 +222,15 @@ export default function MainScreen({ navigation, user, themeName = 'dark' }) {
       >
         {newDevices.length > 0 && (
           <View style={styles.newDevicesSection}>
-            <Text style={styles.newDevicesHeader}>🔧 Dispositivos Novos</Text>
+            <View style={styles.newDevicesHeaderRow}>
+              <Ionicons
+                name="construct-outline"
+                size={24}
+                color={theme.colors.primary}
+                style={styles.newDevicesIcon}
+              />
+              <Text style={styles.newDevicesHeader}>Dispositivos Novos</Text>
+            </View>
             <Text style={styles.newDevicesSubtitle}>
               Estes dispositivos precisam ter o tipo definido
             </Text>
@@ -229,7 +240,7 @@ export default function MainScreen({ navigation, user, themeName = 'dark' }) {
 
         {renderCategoryButton(
           'Sensores de Gás e Fumaça',
-          '🛡️',
+          'flame-outline',
           sensorDevices,
           'sensores',
           (() => {
@@ -247,7 +258,7 @@ export default function MainScreen({ navigation, user, themeName = 'dark' }) {
         )}
         {renderCategoryButton(
           'Pulseiras Assistivas',
-          '⌚',
+          'watch-outline',
           pulseiraDevices,
           'pulseira',
           (() => {
@@ -257,7 +268,7 @@ export default function MainScreen({ navigation, user, themeName = 'dark' }) {
         )}
         {renderCategoryButton(
           'Detectores de Queda',
-          '📱',
+          'body-outline',
           detectorDevices,
           'detector',
           (() => {
@@ -310,6 +321,15 @@ const createStyles = (theme) => StyleSheet.create({
     color: theme.colors.text,
     marginBottom: 5,
   },
+  newDevicesHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 8,
+  },
+  newDevicesIcon: {
+    marginTop: 2,
+  },
   newDevicesSubtitle: {
     ...typography.body,
     color: theme.colors.muted,
@@ -340,7 +360,6 @@ const createStyles = (theme) => StyleSheet.create({
     alignItems: 'center',
   },
   categoryIcon: {
-    fontSize: 50,
     marginBottom: 12,
   },
   categoryTitle: {
@@ -353,11 +372,6 @@ const createStyles = (theme) => StyleSheet.create({
     color: theme.colors.textSecondary,
     marginTop: 6,
     textAlign: 'center',
-  },
-  categoryCount: {
-    ...typography.small,
-    color: theme.colors.muted,
-    marginTop: 4,
   },
   alertBadge: {
     position: 'absolute',

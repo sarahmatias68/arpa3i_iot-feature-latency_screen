@@ -1,5 +1,6 @@
 import { View, Text, StyleSheet, StatusBar, TouchableOpacity, ScrollView } from 'react-native';
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { Ionicons } from '@expo/vector-icons';
 import { useAlerts } from './AlertsContext';
 import DeviceTypeSelector from './DeviceTypeSelector';
 import { getTheme, typography } from './theme';
@@ -255,7 +256,12 @@ const renderDeviceCard = (device) => {
         showsVerticalScrollIndicator={false}
       >
         <View style={styles.header}>
-          <Text style={styles.headerIcon}>{categoryIcon}</Text>
+          <Ionicons
+            name={categoryIcon || 'apps-outline'}
+            size={64}
+            color={theme.colors.primary}
+            style={styles.headerIcon}
+          />
           <Text style={styles.headerTitle}>{categoryTitle}</Text>
           <Text style={styles.deviceCount}>{categoryDevices.length} dispositivo(s)</Text>
         </View>

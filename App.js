@@ -47,7 +47,7 @@ export default function App() {
   // --- ADICIONADO ---
   // Ref para navegar ao clicar na notificação
   const navigationRef = useNavigationContainerRef();
-  const SERVER_HTTP_BASE = "http://192.168.1.8:86";
+  const SERVER_HTTP_BASE = "http://192.168.1.6:86";
 
   // --- USE EFFECT: auto-login (persistência de sessão) ---
   useEffect(() => {
@@ -122,11 +122,11 @@ export default function App() {
       }
     } catch (_) {}
     if (dtype === 'gas_fumaca') {
-      return { routeName: 'CategoryDevices', params: { categoryTitle: 'Sensores de Gás e Fumaça', categoryIcon: '🛡️', categoryKey: 'sensores', focusDeviceId: deviceId } };
+      return { routeName: 'CategoryDevices', params: { categoryTitle: 'Sensores de Gás e Fumaça', categoryIcon: 'flame-outline', categoryKey: 'sensores', focusDeviceId: deviceId } };
     } else if (dtype === 'pulseira') {
-      return { routeName: 'CategoryDevices', params: { categoryTitle: 'Pulseiras Assistivas', categoryIcon: '⌚', categoryKey: 'pulseira', focusDeviceId: deviceId } };
+      return { routeName: 'CategoryDevices', params: { categoryTitle: 'Pulseiras Assistivas', categoryIcon: 'watch-outline', categoryKey: 'pulseira', focusDeviceId: deviceId } };
     } else if (dtype === 'barreira' || dtype === 'microondas' || dtype === 'detector') {
-      return { routeName: 'CategoryDevices', params: { categoryTitle: 'Detectores de Queda', categoryIcon: '📱', categoryKey: 'detector', focusDeviceId: deviceId } };
+      return { routeName: 'CategoryDevices', params: { categoryTitle: 'Detectores de Queda', categoryIcon: 'body-outline', categoryKey: 'detector', focusDeviceId: deviceId } };
     }
     // Fallback
     return { routeName: 'Main', params: {} };
@@ -239,15 +239,22 @@ export default function App() {
                   />
                 )}
               </Stack.Screen>
+
+              {/* TELA DE LOGS CORRIGIDA */}
               <Stack.Screen
-                name="History"
+                name="Logs"
                 options={{
                   ...getHeaderOptions(),
-                  title: "Histórico de Registros",
+                  title: "Histórico de Alertas",
                 }}
               >
-                {(props) => <LogsScreen {...props} themeName={themeName} />}
+                {/* --- CORREÇÃO APLICADA AQUI --- */}
+                {(props) => (
+                  <LogsScreen {...props} user={user} themeName={themeName} />
+                )}
               </Stack.Screen>
+
+              {/* TELA DE SETTINGS CORRIGIDA */}
               <Stack.Screen
                 name="Settings"
                 options={{
@@ -258,6 +265,7 @@ export default function App() {
                 {(props) => (
                   <SettingsScreen
                     {...props}
+                    user={user}
                     themeName={themeName}
                     onLogout={handleLogout}
                     onChangeTheme={async (name) => {
@@ -363,4 +371,3 @@ export default function App() {
     </NavigationContainer>
   );
 }
-
