@@ -7,7 +7,7 @@ import { useAlerts } from './AlertsContext';
 export default function NotificationHandler({ isAuthenticated }) {
   const navigation = useNavigation();
   const { devicesById } = useAlerts();
-  const SERVER_HTTP_BASE = "http://192.168.2.115:86";
+  const SERVER_HTTP_BASE = "http://192.168.1.6:86";
 
   useEffect(() => {
     if (!isAuthenticated) return;
@@ -61,21 +61,21 @@ export default function NotificationHandler({ isAuthenticated }) {
       if (dtype === 'gas_fumaca') {
         navigation.navigate('CategoryDevices', {
           categoryTitle: 'Sensores de Gás e Fumaça',
-          categoryIcon: '🛡️',
+          categoryIcon: 'flame-outline',
           categoryKey: 'sensores',
           focusDeviceId: deviceId,
         });
       } else if (dtype === 'pulseira') {
         navigation.navigate('CategoryDevices', {
           categoryTitle: 'Pulseiras Assistivas',
-          categoryIcon: '⌚',
+          categoryIcon: 'watch-outline',
           categoryKey: 'pulseira',
           focusDeviceId: deviceId,
         });
       } else if (dtype === 'barreira' || dtype === 'microondas' || dtype === 'detector') {
         navigation.navigate('CategoryDevices', {
           categoryTitle: 'Detectores de Queda',
-          categoryIcon: '📱',
+          categoryIcon: 'body-outline',
           categoryKey: 'detector',
           focusDeviceId: deviceId,
         });
@@ -83,7 +83,7 @@ export default function NotificationHandler({ isAuthenticated }) {
         // Fallback: abre categoria "Detectores" com foco no device
         navigation.navigate('CategoryDevices', {
           categoryTitle: 'Detectores de Queda',
-          categoryIcon: '📱',
+          categoryIcon: 'body-outline',
           categoryKey: 'detector',
           focusDeviceId: deviceId,
         });

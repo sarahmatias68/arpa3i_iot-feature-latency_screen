@@ -1,10 +1,12 @@
 import { View, Text, StyleSheet, StatusBar, TouchableOpacity, ScrollView } from 'react-native';
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
+import { Ionicons } from '@expo/vector-icons';
 import { useAlerts } from './AlertsContext';
 import { ConnectionStatusBanner } from './ConnectionStatusBanner';
 import DeviceTypeSelector from './DeviceTypeSelector';
+import { getTheme, typography } from './theme';
 
-export default function MainScreen({ navigation, user }) {
+export default function MainScreen({ navigation, user, themeName = 'dark' }) {
   const {
     connectionStatus,
     sensorState,
@@ -19,6 +21,8 @@ export default function MainScreen({ navigation, user }) {
 
   const [typeSelectorVisible, setTypeSelectorVisible] = useState(false);
   const [selectedDeviceId, setSelectedDeviceId] = useState(null);
+  const theme = useMemo(() => getTheme(themeName), [themeName]);
+  const styles = useMemo(() => createStyles(theme), [theme]);
 
   const getColorForSensorState = (state) => {
     switch (state) {
@@ -51,7 +55,7 @@ export default function MainScreen({ navigation, user }) {
 
   const renderDeviceCard = (device) => {
     const deviceType = deviceTypes.find(t => t.id === device.deviceType);
-    const typeConfig = deviceType || { name: "Sem tipo", color: "#6b7280", icon: "❓" };
+    const typeConfig = deviceType || { name: "Sem tipo", color: "#6b7280" };
     const hasType = !!device.deviceType;
 
     const statusText = device.connected ? 'Online' : 'Offline';
@@ -170,9 +174,9 @@ export default function MainScreen({ navigation, user }) {
     return devices.map(device => renderDeviceCard(device));
   };
 
-  const renderCategoryButton = (title, icon, devices, categoryKey, status, prependText) => {
+  const renderCategoryButton = (title, iconName, devices, categoryKey, status, prependText) => {
     // status: { text: string | null, bg: string | null }
-    const bgColor = status?.bg || '#2d3748';
+    const bgColor = status?.bg || theme.colors.card ;
     const statusText = status?.text || null;
 
     return (
@@ -181,7 +185,7 @@ export default function MainScreen({ navigation, user }) {
           style={[styles.categoryButton, { backgroundColor: bgColor }]}
           onPress={() => navigation.navigate('CategoryDevices', {
             categoryTitle: title,
-            categoryIcon: icon,
+            categoryIcon: iconName,
             categoryKey: categoryKey,
           })}
           activeOpacity={0.7}
@@ -190,11 +194,13 @@ export default function MainScreen({ navigation, user }) {
             {prependText && (
               <Text style={styles.categoryStatus}>{prependText}</Text>
             )}
-            <Text style={styles.categoryIcon}>{icon}</Text>
+            <Ionicons
+              name={iconName}
+              size={48}
+              color={theme.colors.primary}
+              style={styles.categoryIcon}
+            />
             <Text style={styles.categoryTitle}>{title}</Text>
-            {devices.length > 0 && (
-              <Text style={styles.categoryCount}>({devices.length})</Text>
-            )}
             {statusText && (
               <Text style={styles.categoryStatus}>{statusText}</Text>
             )}
@@ -206,7 +212,7 @@ export default function MainScreen({ navigation, user }) {
   
   return (
     <View style={styles.container}>
-      <StatusBar barStyle="light-content" />
+      <StatusBar barStyle={themeName === 'light' ? 'dark-content' : 'light-content'} />
       <ConnectionStatusBanner status={connectionStatus} />
 
       <ScrollView 
@@ -216,7 +222,15 @@ export default function MainScreen({ navigation, user }) {
       >
         {newDevices.length > 0 && (
           <View style={styles.newDevicesSection}>
-            <Text style={styles.newDevicesHeader}>🔧 Dispositivos Novos</Text>
+            <View style={styles.newDevicesHeaderRow}>
+              <Ionicons
+                name="construct-outline"
+                size={24}
+                color={theme.colors.primary}
+                style={styles.newDevicesIcon}
+              />
+              <Text style={styles.newDevicesHeader}>Dispositivos Novos</Text>
+            </View>
             <Text style={styles.newDevicesSubtitle}>
               Estes dispositivos precisam ter o tipo definido
             </Text>
@@ -226,7 +240,7 @@ export default function MainScreen({ navigation, user }) {
 
         {renderCategoryButton(
           'Sensores de Gás e Fumaça',
-          '🛡️',
+          'flame-outline',
           sensorDevices,
           'sensores',
           (() => {
@@ -244,7 +258,7 @@ export default function MainScreen({ navigation, user }) {
         )}
         {renderCategoryButton(
           'Pulseiras Assistivas',
-          '⌚',
+          'watch-outline',
           pulseiraDevices,
           'pulseira',
           (() => {
@@ -254,7 +268,7 @@ export default function MainScreen({ navigation, user }) {
         )}
         {renderCategoryButton(
           'Detectores de Queda',
-          '📱',
+          'body-outline',
           detectorDevices,
           'detector',
           (() => {
@@ -262,7 +276,6 @@ export default function MainScreen({ navigation, user }) {
             return hasFall ? { text: 'Queda Detectada', bg: '#7f1d1d' } : { text: null, bg: null };
           })()
         )}
-
       </ScrollView>
 
       
@@ -278,10 +291,10 @@ export default function MainScreen({ navigation, user }) {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (theme) => StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#0b1220',
+    backgroundColor: theme.colors.background,
   },
   scrollView: {
     flex: 1,
@@ -294,24 +307,34 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   newDevicesSection: {
-    backgroundColor: '#1f2937',
+    backgroundColor: theme.colors.card,
     borderRadius: 12,
     padding: 20,
     width: '90%',
     maxWidth: 400,
     marginBottom: 20,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
   },
   newDevicesHeader: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#f9fafb',
+    ...typography.h3,
+    color: theme.colors.text,
     marginBottom: 5,
   },
+  newDevicesHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 8,
+  },
+  newDevicesIcon: {
+    marginTop: 2,
+  },
   newDevicesSubtitle: {
-    fontSize: 13,
-    color: '#9ca3af',
+    ...typography.body,
+    color: theme.colors.muted,
     marginBottom: 10,
-    fontStyle: 'italic',
+    fontWeight: 'bold',
   },
   categoryContainer: {
     width: '90%',
@@ -319,48 +342,42 @@ const styles = StyleSheet.create({
     marginBottom: 20,
   },
   categoryButton: {
-    backgroundColor: '#2d3748',
+    backgroundColor: theme.colors.card,
     borderRadius: 16,
     padding: 25,
     alignItems: 'center',
     justifyContent: 'center',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
+    shadowOpacity: theme.name === 'light' ? 0.15 : 0.3,
     shadowRadius: 8,
     elevation: 8,
     position: 'relative',
+    borderWidth: 1,
+    borderColor: theme.colors.border,
   },
   categoryContent: {
     alignItems: 'center',
   },
   categoryIcon: {
-    fontSize: 50,
     marginBottom: 12,
   },
   categoryTitle: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: '#ffffff',
+    ...typography.h3,
+    color: theme.colors.text,
     textAlign: 'center',
   },
   categoryStatus: {
-    fontSize: 14,
-    color: '#e5e7eb',
+    ...typography.smallStrong,
+    color: theme.colors.textSecondary,
     marginTop: 6,
     textAlign: 'center',
-    fontWeight: '600',
-  },
-  categoryCount: {
-    fontSize: 14,
-    color: '#9ca3af',
-    marginTop: 4,
   },
   alertBadge: {
     position: 'absolute',
     top: 10,
     right: 10,
-    backgroundColor: '#ef4444',
+    backgroundColor: theme.colors.danger,
     borderRadius: 12,
     minWidth: 24,
     height: 24,
@@ -369,22 +386,25 @@ const styles = StyleSheet.create({
     paddingHorizontal: 6,
   },
   alertBadgeText: {
-    color: '#ffffff',
+    color: theme.colors.text,
     fontSize: 12,
     fontWeight: 'bold',
   },
   devicesContainer: {
     marginTop: 15,
-    backgroundColor: '#1f2937',
+    backgroundColor: theme.colors.card,
     borderRadius: 12,
     padding: 15,
   },
   deviceHeader: {
     flexDirection: 'row',
-    backgroundColor: '#0e76a8',
+    backgroundColor: theme.colors.card,
     justifyContent: 'space-between',
     alignItems: 'center',
     marginBottom: 8,
+    paddingBottom: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: theme.colors.border,
   },
   typeButtonsContainer: {
     flexDirection: 'row',
@@ -395,15 +415,16 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 6,
     borderRadius: 8,
+    backgroundColor: theme.colors.primary,
   },
   typeButtonText: {
-    color: '#ffffff',
+    color: theme.name === 'light' ? '#ffffff' : theme.colors.text,
     fontSize: 12,
     fontWeight: 'bold',
     textAlign: 'center',
   },
   removeButton: {
-    backgroundColor: '#ef4444',
+    backgroundColor: theme.colors.danger,
     paddingHorizontal: 12,
     paddingVertical: 6,
     borderRadius: 8,
@@ -417,78 +438,74 @@ const styles = StyleSheet.create({
     opacity: 0.5,
   },
   subCard: {
-    backgroundColor: '#111827',
+    backgroundColor: theme.colors.card,
     borderRadius: 10,
     padding: 16,
     marginTop: 10,
-    borderWidth: 2,
-    borderColor: '#374151',
+    borderWidth: 1,
+    borderColor: theme.colors.border,
   },
   subTitle: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: '#f3f4f6',
+    ...typography.h3,
+    color: theme.colors.text,
     flex: 1,
     marginRight: 8,
   },
   subStatus: {
     marginTop: 6,
-    fontSize: 14,
-    fontWeight: 'bold',
+    ...typography.smallStrong,
   },
   deviceInfoBlock: {
     marginTop: 12,
     gap: 5,
   },
   deviceInfoText: {
-    fontSize: 13,
-    color: '#d1d5db',
+    ...typography.small,
+    color: theme.colors.muted,
+    fontWeight: 'bold',
   },
   cardPanicActive: {
-    borderWidth: 3,
-    borderColor: '#ef4444',
-    backgroundColor: '#331111',
+    borderWidth: 2,
+    borderColor: theme.colors.danger,
+    backgroundColor: theme.name === 'light' ? '#fee2e2' : '#331111',
   },
   cardFallActive: {
-    borderWidth: 3,
-    borderColor: '#f59e0b',
-    backgroundColor: '#3b2f0a',
+    borderWidth: 2,
+    borderColor: theme.colors.warning,
+    backgroundColor: theme.name === 'light' ? '#fef3c7' : '#3b2f0a',
   },
   ackHint: {
     marginTop: 8,
-    fontSize: 12,
-    fontWeight: 'bold',
+    ...typography.smallStrong,
   },
-  // Overlay/Modal simples para activeAlert
   alertOverlay: {
     position: 'absolute',
     left: 0,
     right: 0,
     bottom: 0,
     padding: 16,
-    backgroundColor: 'rgba(0,0,0,0.5)',
+    backgroundColor: theme.colors.overlay,
   },
   alertBox: {
-    backgroundColor: '#1f2937',
+    backgroundColor: theme.colors.card,
     borderRadius: 12,
     padding: 16,
-    borderWidth: 2,
-    borderColor: '#374151',
+    borderWidth: 1,
+    borderColor: theme.colors.border,
   },
   alertTitle: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: '#f9fafb',
+    ...typography.h3,
+    color: theme.colors.text,
     marginBottom: 6,
   },
   alertMessage: {
-    fontSize: 14,
-    color: '#e5e7eb',
+    ...typography.body,
+    color: theme.colors.textSecondary,
     marginBottom: 12,
   },
   alertButton: {
     alignSelf: 'flex-end',
-    backgroundColor: '#2563eb',
+    backgroundColor: theme.colors.primary,
     paddingHorizontal: 16,
     paddingVertical: 8,
     borderRadius: 8,

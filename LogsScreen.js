@@ -1,11 +1,11 @@
-import { useState, useCallback } from 'react';
-import { View, Text, StyleSheet, FlatList, ActivityIndicator, RefreshControl, TouchableOpacity, Alert } from 'react-native';
+import { useState, useCallback, useMemo } from 'react';
+import { View, Text, StyleSheet, FlatList, ActivityIndicator, RefreshControl, Alert, TouchableOpacity } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
-import { useMemo } from 'react';
+import { getTheme, typography } from './theme';
 
-const API_URL = 'http://192.168.2.115:86';
+const API_URL = 'http://192.168.1.6:86';
 
-const getAlertColor = (type) => {
+const getAlertColor = (type, theme) => {
   switch (type) {
     case 'PANICO': return '#ef4444';
     case 'QUEDA': return '#ef4444';
@@ -13,20 +13,22 @@ const getAlertColor = (type) => {
     case 'VAZAMENTO_GAS': return '#eab308';
     case 'WIFI': return '#3b82f6';
     case 'INFO': return '#6b7280';
-    default: return '#f9fafb';
+    default: return theme.colors.text;
   }
 };
 
 import DateTimePickerModal from 'react-native-modal-datetime-picker';
 import { Picker } from '@react-native-picker/picker';
 
-export default function LogsScreen({ route }) {
-  const user = route?.params?.user;
+export default function LogsScreen({ route, user, themeName = 'dark' }) {
+
+  const theme = useMemo(() => getTheme(themeName), [themeName]);
+  const styles = useMemo(() => createStyles(theme), [theme]);
 
   if (!user) {
     return (
       <View style={styles.container_loader}>
-        <ActivityIndicator size="large" color="#f9fafb" />
+        <ActivityIndicator size="large" color={theme.colors.text} />
         <Text style={styles.loader_text}>Carregando dados do usuário...</Text>
       </View>
     );
@@ -47,8 +49,6 @@ export default function LogsScreen({ route }) {
     setIsLoading(true);
     try {
       const response = await fetch(`${API_URL}/alerts`);
-
-      console.info(response);
       if (!response.ok) throw new Error('Falha na resposta do servidor.');
       const data = await response.json();
       setAllAlerts(data);
@@ -61,17 +61,6 @@ export default function LogsScreen({ route }) {
   }, []);
 
   useFocusEffect(useCallback(() => { fetchAlerts(); }, [fetchAlerts]));
-
-      const handleAcknowledge = async (id) => {
-    try {
-      const response = await fetch(`${API_URL}/acknowledge`, { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body: `id=${id}&user=${user.name}` });
-      const result = await response.json();
-      if (result.status === 'success') {
-        Alert.alert('Sucesso', 'Alerta confirmado.');
-        fetchAlerts();
-      } else { throw new Error(result.message || 'Falha ao confirmar.'); }
-    } catch (error) { Alert.alert('Erro', error.message); }
-  };
 
   const filteredAlerts = useMemo(() => {
     return allAlerts.filter(alert => {
@@ -100,34 +89,26 @@ export default function LogsScreen({ route }) {
 
   const renderItem = ({ item }) => (
     <View style={styles.tableRow}>
-      <Text style={[styles.tableCell, styles.typeCell, { color: getAlertColor(item.alert_type) }]}>{item.alert_type}</Text>
+      <Text style={[styles.tableCell, styles.typeCell, { color: getAlertColor(item.alert_type, theme) }]}>{item.alert_type}</Text>
       <Text style={[styles.tableCell, styles.messageCell]}>{item.message}</Text>
       <Text style={[styles.tableCell, styles.timestampCell]}>{item.timestamp}</Text>
-      <View style={[styles.tableCell, styles.actionCell]}>
-        {item.acknowledged_by ? (
-          <View style={styles.acknowledgedContainer}><Text style={styles.acknowledgedUser}>{item.acknowledged_by}</Text><Text style={styles.acknowledgedTime}>{item.acknowledged_at}</Text></View>
-        ) : (
-          <TouchableOpacity style={styles.ackButton} onPress={() => handleAcknowledge(item.id)}><Text style={styles.ackButtonText}>Confirmar</Text></TouchableOpacity>
-        )}
-      </View>
     </View>
   );
 
-    if (!user) {
-    return (
-      <View style={styles.container_loader}>
-        <ActivityIndicator size="large" color="#f9fafb" />
-        <Text style={styles.loader_text}>Carregando dados do usuário...</Text>
-      </View>
-    );
-  }
+
 
   return (
     <View style={styles.container}>
       <View style={styles.filterContainer}>
-        <TouchableOpacity style={[styles.filterButton, statusFilter === 'pending' && styles.activeFilter]} onPress={() => setStatusFilter('pending')}><Text style={styles.filterText}>Pendentes</Text></TouchableOpacity>
-        <TouchableOpacity style={[styles.filterButton, statusFilter === 'acknowledged' && styles.activeFilter]} onPress={() => setStatusFilter('acknowledged')}><Text style={styles.filterText}>Confirmados</Text></TouchableOpacity>
-        <TouchableOpacity style={[styles.filterButton, statusFilter === 'all' && styles.activeFilter]} onPress={() => setStatusFilter('all')}><Text style={styles.filterText}>Todos</Text></TouchableOpacity>
+        <TouchableOpacity style={[styles.filterButton, statusFilter === 'pending' && styles.activeFilter]} onPress={() => setStatusFilter('pending')}>
+          <Text style={[styles.filterText, statusFilter === 'pending' && styles.activeFilterText]}>Pendentes</Text>
+        </TouchableOpacity>
+        <TouchableOpacity style={[styles.filterButton, statusFilter === 'acknowledged' && styles.activeFilter]} onPress={() => setStatusFilter('acknowledged')}>
+          <Text style={[styles.filterText, statusFilter === 'acknowledged' && styles.activeFilterText]}>Confirmados</Text>
+        </TouchableOpacity>
+        <TouchableOpacity style={[styles.filterButton, statusFilter === 'all' && styles.activeFilter]} onPress={() => setStatusFilter('all')}>
+          <Text style={[styles.filterText, statusFilter === 'all' && styles.activeFilterText]}>Todos</Text>
+        </TouchableOpacity>
       </View>
 
       <View style={styles.dateFilterContainer}>
@@ -137,7 +118,7 @@ export default function LogsScreen({ route }) {
       </View>
 
       <View style={styles.pickerContainer}>
-        <Picker selectedValue={typeFilter} onValueChange={(itemValue) => setTypeFilter(itemValue)} style={styles.picker} dropdownIconColor="#f9fafb">
+        <Picker selectedValue={typeFilter} onValueChange={(itemValue) => setTypeFilter(itemValue)} style={styles.picker} dropdownIconColor={theme.colors.text}>
           <Picker.Item label="Todos os Tipos" value="all" />
           <Picker.Item label="Pânico" value="PANICO" />
           <Picker.Item label="Queda" value="QUEDA" />
@@ -148,15 +129,14 @@ export default function LogsScreen({ route }) {
         </Picker>
       </View>
 
-      {isLoading ? <ActivityIndicator size="large" color="#f9fafb" style={{ marginTop: 50 }} /> : (
+      {isLoading ? <ActivityIndicator size="large" color={theme.colors.text} style={{ marginTop: 50 }} /> : (
         <>
           <View style={styles.tableHeader}>
             <Text style={[styles.headerText, styles.typeCell]}>Tipo</Text>
             <Text style={[styles.headerText, styles.messageCell]}>Mensagem</Text>
             <Text style={[styles.headerText, styles.timestampCell]}>Data</Text>
-            <Text style={[styles.headerText, styles.actionCell]}>Ação / Usuário</Text>
           </View>
-          <FlatList data={filteredAlerts} renderItem={renderItem} keyExtractor={(item) => item.id.toString()} refreshControl={<RefreshControl refreshing={isLoading} onRefresh={fetchAlerts} tintColor="#fff" />} ListEmptyComponent={<Text style={styles.emptyText}>Nenhum alerta encontrado para os filtros selecionados.</Text>} />
+          <FlatList data={filteredAlerts} renderItem={renderItem} keyExtractor={(item) => item.id.toString()} refreshControl={<RefreshControl refreshing={isLoading} onRefresh={fetchAlerts} tintColor={theme.colors.text} />} ListEmptyComponent={<Text style={styles.emptyText}>Nenhum alerta encontrado para os filtros selecionados.</Text>} />
         </>
       )}
       <DateTimePickerModal isVisible={isDatePickerVisible} mode="date" onConfirm={handleConfirmDate} onCancel={hideDatePicker} />
@@ -164,41 +144,37 @@ export default function LogsScreen({ route }) {
   );
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#111827' },
-  filterContainer: { flexDirection: 'row', justifyContent: 'space-around', backgroundColor: '#1f2937', paddingVertical: 10 },
-  filterButton: { paddingVertical: 8, paddingHorizontal: 15, borderRadius: 20, backgroundColor: '#374151' },
-  activeFilter: { backgroundColor: '#3b82f6' },
-  filterText: { color: '#f9fafb', fontWeight: 'bold' },
-  dateFilterContainer: { flexDirection: 'row', justifyContent: 'space-around', alignItems: 'center', padding: 10, backgroundColor: '#1f2937', borderTopWidth: 1, borderTopColor: '#374151' },
-  dateButton: { backgroundColor: '#374151', padding: 10, borderRadius: 5, flex: 1, marginHorizontal: 5 },
-  dateButtonText: { color: '#f9fafb', textAlign: 'center' },
-  clearButton: { backgroundColor: '#4b5563', padding: 10, borderRadius: 5 },
-  clearButtonText: { color: '#f9fafb' },
-  pickerContainer: { backgroundColor: '#1f2937', paddingHorizontal: 10, borderTopWidth: 1, borderTopColor: '#374151' },
-  picker: { color: '#f9fafb', height: 50 },
-  tableHeader: { flexDirection: 'row', borderBottomWidth: 2, borderBottomColor: '#374151', paddingHorizontal: 10, paddingVertical: 12, backgroundColor: '#1f2937' },
-  headerText: { color: '#d1d5db', fontWeight: 'bold', fontSize: 14 },
-  tableRow: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 10, paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: '#374151' },
-  tableCell: { color: '#d1d5db', fontSize: 12 },
+const createStyles = (theme) => StyleSheet.create({
+  container: { flex: 1, backgroundColor: theme.colors.background },
+  filterContainer: { flexDirection: 'row', justifyContent: 'space-around', backgroundColor: theme.colors.card, paddingVertical: 10 },
+  filterButton: { paddingVertical: 8, paddingHorizontal: 15, borderRadius: 20, backgroundColor: theme.colors.border },
+  activeFilter: { backgroundColor: theme.colors.primary },
+  filterText: { ...typography.smallStrong, color: theme.colors.text },
+  activeFilterText: { color: theme.name === 'light' ? '#fff' : theme.colors.text },
+  dateFilterContainer: { flexDirection: 'row', justifyContent: 'space-around', alignItems: 'center', padding: 10, backgroundColor: theme.colors.card, borderTopWidth: 1, borderTopColor: theme.colors.border },
+  dateButton: { backgroundColor: theme.colors.border, padding: 10, borderRadius: 5, flex: 1, marginHorizontal: 5 },
+  dateButtonText: { ...typography.smallStrong, color: theme.colors.text, textAlign: 'center' },
+  clearButton: { backgroundColor: theme.colors.border, padding: 10, borderRadius: 5 },
+  clearButtonText: { ...typography.smallStrong, color: theme.colors.text, textAlign: 'center' },
+  pickerContainer: { backgroundColor: theme.colors.card, paddingHorizontal: 10, borderTopWidth: 1, borderTopColor: theme.colors.border },
+  picker: { color: theme.colors.text, height: 50 },
+  tableHeader: { flexDirection: 'row', borderBottomWidth: 2, borderBottomColor: theme.colors.border, paddingHorizontal: 10, paddingVertical: 12, backgroundColor: theme.colors.card },
+  headerText: { ...typography.smallStrong, color: theme.colors.text },
+  tableRow: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 10, paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: theme.colors.border },
+  tableCell: { ...typography.small, color: theme.colors.text },
   typeCell: { flex: 2, fontWeight: 'bold', textTransform: 'uppercase' },
   messageCell: { flex: 3 },
   timestampCell: { flex: 3 },
-  actionCell: { flex: 2, alignItems: 'center' },
-  ackButton: { backgroundColor: '#10b981', paddingVertical: 10, paddingHorizontal: 15, borderRadius: 5 },
-  ackButtonText: { color: '#fff', fontWeight: 'bold' },
-  acknowledgedContainer: { alignItems: 'center' },
-  acknowledgedUser: { color: '#10b981', fontWeight: 'bold', fontSize: 14 },
-  acknowledgedTime: { color: '#6b7280', fontSize: 12, marginTop: 2 },
-  emptyText: { color: '#9ca3af', textAlign: 'center', marginTop: 50 },
+  emptyText: { ...typography.small, color: theme.colors.textSecondary, textAlign: 'center', marginTop: 50 },
   container_loader: {
     flex: 1,
-    backgroundColor: '#111827',
+    backgroundColor: theme.colors.background,
     alignItems: 'center',
     justifyContent: 'center',
   },
   loader_text: {
-    color: '#f9fafb',
+    ...typography.body,
+    color: theme.colors.text,
     marginTop: 10,
   },
 });

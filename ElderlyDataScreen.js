@@ -1,14 +1,17 @@
-import { useState, useCallback } from 'react';
+import { useMemo, useState, useCallback } from 'react';
 import { View, Text, TextInput, StyleSheet, ScrollView, ActivityIndicator, Alert, TouchableOpacity, KeyboardAvoidingView, Platform } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
+import { getTheme, typography } from './theme';
 
-const API_URL = 'http://192.168.2.115:86';
+const API_URL = 'http://192.168.1.6:86';
 
-const ElderlyDataScreen = () => {
+const ElderlyDataScreen = ({ themeName = 'dark' }) => {
   const [elderlyData, setElderlyData] = useState(null);
   const [originalData, setOriginalData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [viewMode, setViewMode] = useState('loading'); 
+  const theme = useMemo(() => getTheme(themeName), [themeName]);
+  const styles = useMemo(() => createStyles(theme), [theme]);
   const fetchData = useCallback(async () => {
     setLoading(true);
     setViewMode('loading');
@@ -154,7 +157,7 @@ const ElderlyDataScreen = () => {
   );
 
   if (loading) {
-    return <View style={styles.loader}><ActivityIndicator size="large" color="#3b82f6" /></View>;
+    return <View style={styles.loader}><ActivityIndicator size="large" color={theme.colors.primary} /></View>;
   }
 
   return (
@@ -166,7 +169,7 @@ const ElderlyDataScreen = () => {
   );
 };
 
-const styles = StyleSheet.create({
+const createStyles = (theme) => StyleSheet.create({
   emptyContainer: {
     flex: 1,
     justifyContent: 'center',
@@ -174,85 +177,86 @@ const styles = StyleSheet.create({
     padding: 20,
   },
   emptyText: {
-    color: '#9ca3af',
+    ...typography.body,
+    color: theme.colors.muted,
     textAlign: 'center',
-    fontSize: 16,
     marginBottom: 20,
   },
   card: {
-    backgroundColor: '#1f2937',
+    backgroundColor: theme.colors.card,
     borderRadius: 10,
     padding: 20,
     marginBottom: 20,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
   },
   cardLabel: {
-    fontSize: 14,
-    color: '#9ca3af',
+    ...typography.smallStrong,
+    color: theme.colors.textSecondary,
     marginBottom: 4,
   },
   cardValue: {
-    fontSize: 18,
-    color: '#f9fafb',
+    ...typography.body,
+    color: theme.colors.text,
     marginBottom: 16,
   },
   cancelButton: {
-    backgroundColor: '#4b5563',
+    backgroundColor: theme.colors.border,
     marginTop: 15,
   },
   container: {
     flex: 1,
-    backgroundColor: '#0b1220',
+    backgroundColor: theme.colors.background,
   },
   contentContainer: {
     padding: 20,
-    backgroundColor: '#0b1220',
+    backgroundColor: theme.colors.background,
   },
   loader: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#111827',
+    backgroundColor: theme.colors.background,
   },
   title: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: '#f9fafb',
+    ...typography.h1,
+    color: theme.colors.text,
     textAlign: 'center',
     marginBottom: 20,
   },
   label: {
-    fontSize: 16,
-    color: '#d1d5db',
+    ...typography.bodyStrong,
+    color: theme.colors.textSecondary,
     marginBottom: 8,
   },
   input: {
-    backgroundColor: '#1f2937',
-    color: '#f9fafb',
+    backgroundColor: theme.colors.card,
+    color: theme.colors.text,
     paddingHorizontal: 15,
     paddingVertical: 12,
     borderRadius: 8,
     fontSize: 16,
     marginBottom: 20,
     borderWidth: 1,
-    borderColor: '#374151',
+    borderColor: theme.colors.border,
   },
   textArea: {
     height: 100,
     textAlignVertical: 'top',
   },
   button: {
-    backgroundColor: '#2563eb',
+    backgroundColor: theme.colors.primary,
     padding: 15,
     borderRadius: 8,
     alignItems: 'center',
     marginTop: 10,
   },
   deleteButton: {
-    backgroundColor: '#ef4444', // Cor vermelha para exclusão
+    backgroundColor: theme.colors.danger,
     marginTop: 15,
   },
   buttonText: {
-    color: '#f9fafb',
+    color: '#ffffff',
     fontSize: 18,
     fontWeight: 'bold',
   },

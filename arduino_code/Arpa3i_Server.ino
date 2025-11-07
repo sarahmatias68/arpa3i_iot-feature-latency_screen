@@ -99,6 +99,7 @@ void enviarAlertaVercel(String tipoAlerta, String local, String dispositivo);
 String urlEncode(String str);
 bool testCloudConnection();
 void resetFailedConnectionCounter();
+bool closeDatabaseSafely();
 
 
 void wifiManagerCallback(WiFiManager *myWiFiManager) {
@@ -651,8 +652,11 @@ bool copyFile(const char* srcPath, const char* destPath) {
 
 void performBackup() {
     Serial.println("Iniciando rotina de backup do banco de dados...");
-    sqlite3_close(db);
-    delay(100);
+    if (!closeDatabaseSafely()) {
+        Serial.println("Backup abortado: banco de dados ainda possui statements ativos.");
+        return;
+    }
+    delay(50);
     bool backup_success = false;
     for (int i = 0; i < 5; i++) {
         if (copyFile(db_path, db_backup_path)) { backup_success = true; break; }
@@ -660,13 +664,37 @@ void performBackup() {
     }
     if (backup_success) Serial.println("Backup do banco de dados concluido com sucesso.");
     else Serial.println("Falha ao criar o backup do banco de dados apos multiplas tentativas.");
-    if (sqlite3_open(db_path, &db)) Serial.printf("CRITICO: Nao foi possivel reabrir o banco de dados: %s\n", sqlite3_errmsg(db));
-    else Serial.println("Banco de dados reaberto com sucesso.");
+    if (sqlite3_open(db_path, &db)) {
+        Serial.printf("CRITICO: Nao foi possivel reabrir o banco de dados apos backup: %s\n", sqlite3_errmsg(db));
+        db = nullptr;
+    } else {
+        Serial.println("Banco de dados reaberto com sucesso.");
+    }
     last_backup_time = millis();
 }
 
 void handleBackup() {
     if (millis() - last_backup_time > backup_interval) { performBackup(); }
+}
+
+bool closeDatabaseSafely() {
+    if (!db) return true;
+    const uint8_t maxAttempts = 5;
+    for (uint8_t attempt = 0; attempt < maxAttempts; attempt++) {
+        sqlite3_stmt *openStmt = sqlite3_next_stmt(db, nullptr);
+        while (openStmt) {
+            sqlite3_finalize(openStmt);
+            openStmt = sqlite3_next_stmt(db, nullptr);
+        }
+        int rc = sqlite3_close_v2(db);
+        if (rc == SQLITE_OK) {
+            db = nullptr;
+            return true;
+        }
+        Serial.printf("Aviso: tentativa %d para fechar banco retornou %d. Retentando...\n", attempt + 1, rc);
+        delay(50);
+    }
+    return false;
 }
 
 void initDatabase() {

@@ -80,8 +80,8 @@
 
 ### URLs do Servidor
 ```javascript
-const WEBSOCKET_URL = "ws://192.168.2.115:86/ws";
-const API_URL = "http://192.168.2.115:86";
+const WEBSOCKET_URL = "ws://192.168.1.6:86/ws";
+const API_URL = "http://192.168.1.6:86";
 ```
 
 ### Tipos de Alertas Processados

@@ -16,7 +16,7 @@
 ADC_MODE(ADC_VCC);
 
 // --- CONFIGURAÇÕES DE REDE ---
-char ws_host[20] = "192.168.2.115";
+char ws_host[20] = "192.168.1.6";
 const uint16_t ws_port = 86;
 const char* ws_path = "/ws";
 

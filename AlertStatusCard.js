@@ -1,17 +1,18 @@
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 
 export default function AlertStatusCard({ activeAlert, onDismiss }) {
   if (!activeAlert) return null;
 
   const getAlertIcon = (type) => {
     switch (type) {
-      case 'QUEDA': return '⚠️';
-      case 'PANICO': return '🚨';
-      case 'BATERIA_FRACA': return '🔋';
-      case 'FUMACA_SIMULADA': return '💨';
-      case 'GAS_SIMULADO': return '⛽';
-      default: return '⚠️';
+      case 'QUEDA': return 'warning-outline';
+      case 'PANICO': return 'alert-circle-outline';
+      case 'BATERIA_FRACA': return 'battery-dead-outline';
+      case 'FUMACA_SIMULADA': return 'cloud-outline';
+      case 'GAS_SIMULADO': return 'flame-outline';
+      default: return 'alert-circle-outline';
     }
   };
 
@@ -29,7 +30,12 @@ export default function AlertStatusCard({ activeAlert, onDismiss }) {
   return (
     <View style={[styles.alertCard, { borderColor: getAlertColor(activeAlert.type) }]}>
       <View style={styles.alertHeader}>
-        <Text style={styles.alertIcon}>{getAlertIcon(activeAlert.type)}</Text>
+        <Ionicons
+          name={getAlertIcon(activeAlert.type)}
+          size={28}
+          color={getAlertColor(activeAlert.type)}
+          style={styles.alertIcon}
+        />
         <Text style={[styles.alertTitle, { color: getAlertColor(activeAlert.type) }]}>
           {activeAlert.title}
         </Text>

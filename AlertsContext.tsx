@@ -88,8 +88,8 @@ interface AlertsContextType {
   alertsQueue: AlertItem[];
 }
 
-const WEBSOCKET_URL = "ws://192.168.2.115:86/ws";
-const SERVER_HTTP_BASE = "http://192.168.2.115:86";
+const WEBSOCKET_URL = "ws://192.168.1.6:86/ws";
+const SERVER_HTTP_BASE = "http://192.168.1.6:86";
 const DEVICE_TIMEOUT_MS = 11 * 60 * 1000; // 11 minutos
 
 const AlertsContext = createContext<AlertsContextType | undefined>(undefined);
@@ -121,11 +121,11 @@ export const AlertsProvider: React.FC<AlertsProviderProps> = ({
   const ws = useRef<WsConnection | null>(null);
 
   const deviceTypes: DeviceTypeConfig[] = [
-    { id: "pulseira", name: "Pulseira Assistiva", color: "#3b82f6", icon: "⌚" },
-    { id: "barreira", name: "Barreira", color: "#10b981", icon: "🚧" },
-    { id: "detector", name: "Detector de Queda", color: "#ef4444", icon: "📱" },
-    { id: "microondas", name: "Micro-ondas", color: "#f59e0b", icon: "📡" },
-    { id: "gas_fumaca", name: "Gás e Fumaça", color: "#6b7280", icon: "🔥" },
+    { id: "pulseira", name: "Pulseira Assistiva", color: "#3b82f6", icon: "watch-outline" },
+    { id: "barreira", name: "Barreira", color: "#10b981", icon: "shield-outline" },
+    { id: "detector", name: "Detector de Queda", color: "#ef4444", icon: "body-outline" },
+    { id: "microondas", name: "Micro-ondas", color: "#f59e0b", icon: "radio-outline" },
+    { id: "gas_fumaca", name: "Gás e Fumaça", color: "#6b7280", icon: "flame-outline" },
   ];
 
   const markAllDevicesAsOffline = useCallback(() => {
@@ -450,7 +450,7 @@ export const AlertsProvider: React.FC<AlertsProviderProps> = ({
     if (alertsQueue.length > 0) {
       const first = alertsQueue[0];
       setActiveAlert({
-        title: first.type === 'PANICO' ? '🚨 ALERTA DE PÂNICO!' : '⚠️ ALERTA DE QUEDA!',
+        title: first.type === 'PANICO' ? 'Alerta de Pânico!' : 'Alerta de Queda!',
         message: first.message,
         type: first.type,
         timestamp: first.timestamp,
