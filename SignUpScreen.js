@@ -1,7 +1,11 @@
 import React, { useState } from 'react';
 import { View, Text, TextInput, TouchableOpacity, StyleSheet, Alert, ActivityIndicator, KeyboardAvoidingView, TouchableWithoutFeedback, Keyboard, Platform } from 'react-native';
 
+<<<<<<< HEAD
 const API_URL = 'http://192.168.1.6:86'; 
+=======
+const API_URL = 'http://192.168.1.7:86'; 
+>>>>>>> parent of ace65bc (updates)
 
 const SignUpScreen = ({ navigation }) => {
   const [name, setName] = useState('');

@@ -7,7 +7,11 @@ import { useAlerts } from './AlertsContext';
 export default function NotificationHandler({ isAuthenticated }) {
   const navigation = useNavigation();
   const { devicesById } = useAlerts();
+<<<<<<< HEAD
   const SERVER_HTTP_BASE = "http://192.168.1.6:86";
+=======
+  const SERVER_HTTP_BASE = "http://192.168.1.7:86";
+>>>>>>> parent of ace65bc (updates)
 
   useEffect(() => {
     if (!isAuthenticated) return;

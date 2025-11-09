@@ -1,0 +1,18 @@
+
+
+
+:root {
+    --primary-color: #111827;
+    --secondary-color: #1f2937;
+    --tertiary-color: #7a8a99;
+    --accent-color: #10b981;
+    --error-color: #ef4444;
+    --warning-color: #f59e0b;
+    --info-color: #3b82f6;
+    --success-color: #22c55e;
+}
+
+.dark {
+    --background-color: #111827;
+    --text-color: #f9fafb;
+}

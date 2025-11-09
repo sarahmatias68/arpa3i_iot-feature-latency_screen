@@ -3,7 +3,11 @@ import { View, Text, StyleSheet, FlatList, ActivityIndicator, RefreshControl, Al
 import { useFocusEffect } from '@react-navigation/native';
 import { getTheme, typography } from './theme';
 
+<<<<<<< HEAD
 const API_URL = 'http://192.168.1.6:86';
+=======
+const API_URL = 'http://192.168.1.7:86';
+>>>>>>> parent of ace65bc (updates)
 
 const getAlertColor = (type, theme) => {
   switch (type) {

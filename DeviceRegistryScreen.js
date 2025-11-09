@@ -130,7 +130,26 @@ const DeviceRegistryScreen = ({ navigation, themeName = 'dark' }) => {
           >
             <Text style={[styles.fullButtonText, styles.fullButtonSecondaryText]}>Eventos</Text>
           </TouchableOpacity>
+<<<<<<< HEAD
           {/* ----- FIM DA ALTERAÇÃO ----- */}
+=======
+        </View>
+        <Text style={styles.meta}>
+          Status: <Text style={{ color: item.connected ? theme.colors.success : theme.colors.danger }}>{item.connected ? 'online' : 'offline'}</Text>
+          {item.deviceType ? `  •  Tipo: ${item.deviceType}` : '  •  Tipo: não definido'}
+        </Text>
+      </View>
+      <View style={styles.actionsColumn}>
+        <TouchableOpacity style={styles.fullButton} onPress={() => openSelector(item.deviceId)}>
+          <Text style={styles.fullButtonText}>Definir Tipo</Text>
+        </TouchableOpacity>
+        <TouchableOpacity style={[styles.fullButton, styles.fullButtonSecondary]} onPress={() => handleClearType(item.deviceId)}>
+          <Text style={[styles.fullButtonText, styles.fullButtonSecondaryText]}>Limpar Tipo</Text>
+        </TouchableOpacity>
+      </View>
+    </TouchableOpacity>
+  );
+>>>>>>> parent of ace65bc (updates)
 
           <TouchableOpacity style={[styles.fullButton, styles.fullButtonSecondary]} onPress={() => handleClearType(item.deviceId)}>
             <Text style={[styles.fullButtonText, styles.fullButtonSecondaryText]}>Limpar Tipo</Text>
@@ -167,6 +186,7 @@ const DeviceRegistryScreen = ({ navigation, themeName = 'dark' }) => {
 
 // ... (seus styles permanecem os mesmos)
 const createStyles = (theme) => StyleSheet.create({
+<<<<<<< HEAD
   container: { flex: 1, backgroundColor: theme.colors.background, padding: 16 },
   broadcastButton: { backgroundColor: theme.colors.success, padding: 12, borderRadius: 8, marginBottom: 12, alignItems: 'center' },
   broadcastButtonText: { color: theme.name === 'light' ? theme.colors.text : '#06251c', fontWeight: '700' },
@@ -182,6 +202,23 @@ const createStyles = (theme) => StyleSheet.create({
   fullButtonSecondaryText: { color: theme.colors.text },
   iconButton: { padding: 8, borderRadius: 8, backgroundColor: theme.colors.card, borderWidth: 1, borderColor: theme.colors.border },
   iconButtonDanger: { backgroundColor: theme.colors.background },
+=======
+  container: { flex: 1, backgroundColor: theme.colors.background, padding: 16 },
+  broadcastButton: { backgroundColor: theme.colors.success, padding: 12, borderRadius: 8, marginBottom: 12, alignItems: 'center' },
+  broadcastButtonText: { color: theme.name === 'light' ? theme.colors.text : '#06251c', fontWeight: '700' },
+  itemRow: { flexDirection: 'row', alignItems: 'stretch', backgroundColor: theme.colors.card, padding: 12, borderRadius: 12, borderWidth: 1, borderColor: theme.colors.border, gap: 12 },
+  itemBody: { flex: 1 },
+  itemHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' },
+  deviceId: { color: theme.colors.text, marginBottom: 4, ...typography.bodyStrong },
+  meta: { color: theme.colors.muted, ...typography.small },
+  actionsColumn: { justifyContent: 'space-between', gap: 8 },
+  fullButton: { backgroundColor: theme.colors.primary, paddingVertical: 8, paddingHorizontal: 16, borderRadius: 8, alignItems: 'center' },
+  fullButtonSecondary: { backgroundColor: theme.colors.border },
+  fullButtonText: { color: theme.name === 'light' ? '#ffffff' : theme.colors.text, fontWeight: '600' },
+  fullButtonSecondaryText: { color: theme.colors.text },
+  iconButton: { padding: 8, borderRadius: 8, backgroundColor: theme.colors.card, borderWidth: 1, borderColor: theme.colors.border },
+  iconButtonDanger: { backgroundColor: theme.colors.background },
+>>>>>>> parent of ace65bc (updates)
 });
 
 export default DeviceRegistryScreen;

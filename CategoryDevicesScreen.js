@@ -96,7 +96,7 @@ export default function CategoryDevicesScreen({ route, navigation, themeName = '
     setSelectedDeviceId(null);
   };
 
-const renderDeviceCard = (device) => {
+  const renderDeviceCard = (device) => {
     const deviceType = deviceTypes.find(t => t.id === device.deviceType);
     const typeConfig = deviceType || { name: "Sem tipo", color: theme.colors.muted };
     const hasType = !!device.deviceType;
@@ -109,7 +109,7 @@ const renderDeviceCard = (device) => {
       : null;
     
     const isAlertActive = !!device.lastAlertType;
-    const alertStyle =  
+    const alertStyle = 
         device.lastAlertType === 'PANICO' ? styles.cardPanicActive :
         device.lastAlertType === 'QUEDA' ? styles.cardFallActive : null;
     
@@ -132,74 +132,6 @@ const renderDeviceCard = (device) => {
           <Text style={styles.deviceTitle} numberOfLines={1} ellipsizeMode="tail">
             {isSensorDevice ? "Sensor de Gás e Fumaça" : device.deviceId}
           </Text>
-        </View>
-        <View style={styles.mainContent}>
-          <View style={styles.infoColumn}>
-            {isSensorDevice ? (
-              <View style={styles.sensorStateContainer}>
-                <Text style={styles.sensorStateLabel}>Estado do Ambiente:</Text>
-                <Text style={[styles.sensorStateText, { color: getColorForSensorState(sensorState) }]}>
-                  {sensorState || 'Indisponível'}
-                </Text>
-                {typeof device.lastSeen === 'number' && device.lastSeen > 0 && (
-                  <Text style={[styles.sensorStateLabel, { marginTop: 8 }]}>Atualizado há {Math.max(0, Math.floor((Date.now() - device.lastSeen)/1000))}s</Text>
-                )}
-              </View>
-            ) : (
-              // USAMOS UM FRAGMENT PARA AGRUPAR AS INFORMAÇÕES
-              <>
-                <Text style={[styles.deviceStatus, { color: alertStatusColor }]}>
-                  {alertStatusText}
-                </Text>
-
-                {!device.connected && offlineDuration && (
-                  <Text style={styles.offlineTimer}>
-                    Offline há {formatDuration(offlineDuration)}
-                  </Text>
-                )}
-
-                {!isSensorDevice && isAlertActive && !!device.lastAlertAt && (
-                  <Text style={styles.deviceInfoText}>
-                    Notificado: {new Date(device.lastAlertAt).toLocaleString()}
-                  </Text>
-                )}
-
-                {device.connected && !isSensorDevice && (
-                  <View style={styles.deviceInfoBlock}>
-                    {typeof device.batteryMv === 'number' && (
-                      <Text style={[styles.deviceInfoText, { color: getBatteryColor(device.batteryMv) }]}>
-                        Bateria: {device.batteryMv} mV
-                      </Text>
-                    )}
-                    {typeof device.uptimeSec === 'number' && (
-                      <Text style={styles.deviceInfoText}>
-                        Tempo ligado: {Math.floor(device.uptimeSec/3600)}h {Math.floor((device.uptimeSec%3600)/60)}m
-                      </Text>
-                    )}
-                    {typeof device.rssiDbm === 'number' && (
-                      <Text style={styles.deviceInfoText}>WiFi: {device.rssiDbm} dBm</Text>
-                    )}
-                    {typeof device.tempCpuC === 'number' && (
-                      <Text style={styles.deviceInfoText}>CPU: {device.tempCpuC}°C</Text>
-                    )}
-                    {typeof device.heapB === 'number' && (
-                      <Text style={styles.deviceInfoText}>Heap: {device.heapB} B</Text>
-                    )}
-                    {device.reconnects !== undefined && (
-                      <Text style={styles.deviceInfoText}>Reconexões: {device.reconnects}</Text>
-                    )}
-                    {typeof device.lastSeen === 'number' && device.lastSeen > 0 && (
-                      <Text style={styles.deviceInfoText}>
-                        Atualizado há {Math.max(0, Math.floor((Date.now() - device.lastSeen)/1000))}s
-                      </Text>
-                    )}
-                  </View>
-                )}
-              </>
-            )}
-          </View>
-          
-          {/* COLUNA DA DIREITA (BOTÕES) - MOVIDA PARA CÁ */}
           {!isSensorDevice && (
             <View style={styles.actionsColumn}>
               <TouchableOpacity 
@@ -234,10 +166,63 @@ const renderDeviceCard = (device) => {
               </TouchableOpacity>
             </View>
           )}
-
         </View>
-        
-        {/* O "AckHint" continua no final do card, fora do mainContent */}
+        {isSensorDevice ? (
+          <View style={styles.sensorStateContainer}>
+            <Text style={styles.sensorStateLabel}>Estado do Ambiente:</Text>
+            <Text style={[styles.sensorStateText, { color: getColorForSensorState(sensorState) }]}>
+              {sensorState || 'Indisponível'}
+            </Text>
+            {typeof device.lastSeen === 'number' && device.lastSeen > 0 && (
+              <Text style={[styles.sensorStateLabel, { marginTop: 8 }]}>Atualizado há {Math.max(0, Math.floor((Date.now() - device.lastSeen)/1000))}s</Text>
+            )}
+          </View>
+        ) : (
+          <Text style={[styles.deviceStatus, { color: alertStatusColor }]}>
+            {alertStatusText}
+          </Text>
+        )}
+        {!device.connected && offlineDuration && (
+          <Text style={styles.offlineTimer}>
+            Offline há {formatDuration(offlineDuration)}
+          </Text>
+        )}
+        {!isSensorDevice && isAlertActive && !!device.lastAlertAt && (
+          <Text style={styles.deviceInfoText}>
+            Notificado: {new Date(device.lastAlertAt).toLocaleString()}
+          </Text>
+        )}
+        {device.connected && !isSensorDevice && (
+          <View style={styles.deviceInfoBlock}>
+            {typeof device.batteryMv === 'number' && (
+              <Text style={[styles.deviceInfoText, { color: getBatteryColor(device.batteryMv) }]}>
+                Bateria: {device.batteryMv} mV
+              </Text>
+            )}
+            {typeof device.uptimeSec === 'number' && (
+              <Text style={styles.deviceInfoText}>
+                Tempo ligado: {Math.floor(device.uptimeSec/3600)}h {Math.floor((device.uptimeSec%3600)/60)}m
+              </Text>
+            )}
+            {typeof device.rssiDbm === 'number' && (
+              <Text style={styles.deviceInfoText}>WiFi: {device.rssiDbm} dBm</Text>
+            )}
+            {typeof device.tempCpuC === 'number' && (
+              <Text style={styles.deviceInfoText}>CPU: {device.tempCpuC}°C</Text>
+            )}
+            {typeof device.heapB === 'number' && (
+              <Text style={styles.deviceInfoText}>Heap: {device.heapB} B</Text>
+            )}
+            {device.reconnects !== undefined && (
+              <Text style={styles.deviceInfoText}>Reconexões: {device.reconnects}</Text>
+            )}
+            {typeof device.lastSeen === 'number' && device.lastSeen > 0 && (
+              <Text style={styles.deviceInfoText}>
+                Atualizado há {Math.max(0, Math.floor((Date.now() - device.lastSeen)/1000))}s
+              </Text>
+            )}
+          </View>
+        )}
         {isAlertActive && (
           <Text style={[styles.ackHint, { color: alertStatusColor }]}>Toque para marcar como ciente</Text>
         )}
@@ -326,24 +311,23 @@ const createStyles = (theme) => StyleSheet.create({
     marginBottom: 15,
     borderWidth: 1,
     borderColor: theme.colors.border,
-    alignItems: 'end',
   },
   deviceHeader: {
     marginBottom: 12,
     flexDirection: 'row',
-    alignItems: 'center',
-    borderBottomWidth: 1,
-    borderBottomColor: theme.colors.border_card,
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    gap: 12,
   },
   deviceTitle: {
     ...typography.h3,
     color: theme.colors.text,
     marginBottom: 6,
-    textAlign: 'center',
-    alignItems: 'center',
+    textAlign: 'left',
     flexShrink: 1,
   },
   actionsColumn: {
+    alignItems: 'flex-end',
     gap: 8,
   },
   typeButton: {
@@ -351,7 +335,6 @@ const createStyles = (theme) => StyleSheet.create({
     paddingVertical: 8,
     borderRadius: 8,
     backgroundColor: theme.colors.primary,
-    alignItems: 'center',
   },
   typeButtonText: {
     color: theme.name === 'light' ? '#ffffff' : theme.colors.text,
@@ -363,7 +346,6 @@ const createStyles = (theme) => StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 8,
     borderRadius: 8,
-    alignItems: 'center',
   },
   removeButtonText: {
     color: '#ffffff',
@@ -377,7 +359,6 @@ const createStyles = (theme) => StyleSheet.create({
     borderWidth: 1,
     borderColor: theme.colors.primary,
     backgroundColor: theme.colors.card,
-    alignItems: 'center',
   },
   eventsButtonText: {
     color: theme.colors.primary,
@@ -388,9 +369,9 @@ const createStyles = (theme) => StyleSheet.create({
     opacity: 0.5,
   },
   deviceStatus: {
-    marginTop: 2,
+    marginTop: 6,
     ...typography.smallStrong,
-    marginBottom: 5,
+    marginBottom: 8,
   },
   sensorStateContainer: {
     marginTop: 12,
@@ -415,7 +396,6 @@ const createStyles = (theme) => StyleSheet.create({
   deviceInfoText: {
     ...typography.small,
     color: theme.colors.muted,
-    fontWeight: 'bold',
   },
   offlineTimer: {
     marginTop: 4,
@@ -445,13 +425,5 @@ const createStyles = (theme) => StyleSheet.create({
     ...typography.body,
     color: theme.colors.muted,
     textAlign: 'center',
-  },
-  mainContent: {
-    flexDirection: 'row',
-    alignItems: 'center', 
-  },
-  infoColumn: {
-    flex: 1, 
-  
   },
 });

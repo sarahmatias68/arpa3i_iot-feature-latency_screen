@@ -2,7 +2,11 @@ import React, { useMemo, useState, useEffect } from 'react';
 import { View, Text, TextInput, StyleSheet, TouchableOpacity, Alert, ScrollView, KeyboardAvoidingView, Platform } from 'react-native';
 import { getTheme, typography } from './theme';
 
+<<<<<<< HEAD
 const API_URL = 'http://192.168.1.6:86';
+=======
+const API_URL = 'http://192.168.1.7:86';
+>>>>>>> parent of ace65bc (updates)
 
 const UserDataScreen = ({ user, themeName = 'dark' }) => {
   const [name, setName] = useState('');

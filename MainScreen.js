@@ -174,9 +174,13 @@ export default function MainScreen({ navigation, user, themeName = 'dark' }) {
     return devices.map(device => renderDeviceCard(device));
   };
 
+<<<<<<< HEAD
   const renderCategoryButton = (title, iconName, devices, categoryKey, status, prependText) => {
+=======
+  const renderCategoryButton = (title, icon, devices, categoryKey, status, prependText) => {
+>>>>>>> parent of ace65bc (updates)
     // status: { text: string | null, bg: string | null }
-    const bgColor = status?.bg || theme.colors.card ;
+    const bgColor = status?.bg || '#2d3748';
     const statusText = status?.text || null;
 
     return (
@@ -331,10 +335,10 @@ const createStyles = (theme) => StyleSheet.create({
     marginTop: 2,
   },
   newDevicesSubtitle: {
-    ...typography.body,
+    ...typography.small,
     color: theme.colors.muted,
     marginBottom: 10,
-    fontWeight: 'bold',
+    fontStyle: 'italic',
   },
   categoryContainer: {
     width: '90%',
@@ -462,7 +466,6 @@ const createStyles = (theme) => StyleSheet.create({
   deviceInfoText: {
     ...typography.small,
     color: theme.colors.muted,
-    fontWeight: 'bold',
   },
   cardPanicActive: {
     borderWidth: 2,

@@ -18,7 +18,11 @@
         "NSAppTransportSecurity": {
           "NSAllowsArbitraryLoads": true,
           "NSExceptionDomains": {
+<<<<<<< HEAD
             "192.168.1.6": {
+=======
+            "192.168.1.7": {
+>>>>>>> parent of ace65bc (updates)
               "NSTemporaryExceptionAllowsInsecureHTTPLoads": true,
               "NSIncludesSubdomains": true
             }

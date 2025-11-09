@@ -21,7 +21,11 @@
 ADC_MODE(ADC_VCC); // Habilita a leitura de tensão (VCC) no pino A0
 
 // --- CONFIGURAÇÕES DE REDE E DISPOSITIVO ---
+<<<<<<< HEAD
 char ws_host[20] = "192.168.1.6"; // IP padrão do servidor
+=======
+char ws_host[20] = "192.168.1.7"; // IP padrão do servidor
+>>>>>>> parent of ace65bc (updates)
 const uint16_t ws_port = 86; // <<< ADICIONADO (Faltava)
 const char* ws_path = "/ws"; // <<< ADICIONADO (Faltava)
 char deviceId[40] = "detector_cozinha_1"; // ID padrão

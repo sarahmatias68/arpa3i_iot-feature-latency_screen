@@ -88,8 +88,13 @@ interface AlertsContextType {
   alertsQueue: AlertItem[];
 }
 
+<<<<<<< HEAD
 const WEBSOCKET_URL = "ws://192.168.1.6:86/ws";
 const SERVER_HTTP_BASE = "http://192.168.1.6:86";
+=======
+const WEBSOCKET_URL = "ws://192.168.1.7:86/ws";
+const SERVER_HTTP_BASE = "http://192.168.1.7:86";
+>>>>>>> parent of ace65bc (updates)
 const DEVICE_TIMEOUT_MS = 11 * 60 * 1000; // 11 minutos
 
 const AlertsContext = createContext<AlertsContextType | undefined>(undefined);

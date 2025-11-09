@@ -12,7 +12,11 @@
 
 // --- CONFIGURAÇÕES ---
 #define BUTTON_PIN 1
+<<<<<<< HEAD
 char ws_host[20] = "192.168.1.6";
+=======
+char ws_host[20] = "192.168.1.7";
+>>>>>>> parent of ace65bc (updates)
 const uint16_t ws_port = 86;
 const char* ws_path = "/ws";
 const int WDT_TIMEOUT_S = 10;
