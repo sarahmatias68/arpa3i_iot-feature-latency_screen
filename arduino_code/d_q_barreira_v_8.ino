@@ -56,7 +56,7 @@
 ADC_MODE(ADC_VCC);
 
 // --- CONFIGURAÇÕES DE REDE E DISPOSITIVO ---
-char ws_host[20] = "192.168.1.6";
+char ws_host[20] = "192.168.1.8";
 char deviceId[40] = "barreira_corredor_1";
 
 // --- MAPEAMENTO DE PINOS PARA O ESP-01 (FINAL) ---

@@ -47,7 +47,7 @@ export default function App() {
   // --- ADICIONADO ---
   // Ref para navegar ao clicar na notificação
   const navigationRef = useNavigationContainerRef();
-  const SERVER_HTTP_BASE = "http://192.168.1.6:86";
+  const SERVER_HTTP_BASE = "http://192.168.1.8:86";
 
   // --- USE EFFECT: auto-login (persistência de sessão) ---
   useEffect(() => {

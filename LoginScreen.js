@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { View, Text, TextInput, TouchableOpacity, StyleSheet, Alert, ActivityIndicator, Image, KeyboardAvoidingView, TouchableWithoutFeedback, Keyboard, Platform } from 'react-native';
 
-const API_URL = 'http://192.168.1.6:86';
+const API_URL = 'http://192.168.1.8:86';
 
 const LoginScreen = ({ navigation, onLoginSuccess }) => {
   const [email, setEmail] = useState('');
@@ -100,7 +100,7 @@ const LoginScreen = ({ navigation, onLoginSuccess }) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#1f2937', // Nova cor de fundo
+    backgroundColor: '#7a8a99', 
   },
   inner: {
     flex: 1,
@@ -123,7 +123,7 @@ const styles = StyleSheet.create({
     marginTop: 20,
   },
   linkText: {
-    color: '#3b82f6', // Novo azul para links
+    color: '#384250', 
     fontSize: 16,
   },
   input: {
