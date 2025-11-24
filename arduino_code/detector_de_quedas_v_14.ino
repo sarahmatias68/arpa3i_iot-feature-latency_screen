@@ -12,7 +12,7 @@
 
 // --- CONFIGURAÇÕES ---
 #define BUTTON_PIN 1
-char ws_host[20] = "192.168.1.8";
+char ws_host[20] = "192.168.2.115";
 const uint16_t ws_port = 86;
 const char* ws_path = "/ws";
 const int WDT_TIMEOUT_S = 10;

@@ -3,7 +3,7 @@ import { View, Text, TextInput, StyleSheet, ScrollView, ActivityIndicator, Alert
 import { useFocusEffect } from '@react-navigation/native';
 import { getTheme, typography } from './theme';
 
-const API_URL = 'http://192.168.1.8:86';
+const API_URL = 'http://192.168.2.115:86';
 
 const ElderlyDataScreen = ({ themeName = 'dark' }) => {
   const [elderlyData, setElderlyData] = useState(null);

@@ -88,9 +88,10 @@ interface AlertsContextType {
   alertsQueue: AlertItem[];
 }
 
-const WEBSOCKET_URL = "ws://192.168.1.8:86/ws";
-const SERVER_HTTP_BASE = "http://192.168.1.8:86";
+const WEBSOCKET_URL = "ws://192.168.2.115:86/ws";
+const SERVER_HTTP_BASE = "http://192.168.2.115:86";
 const DEVICE_TIMEOUT_MS = 11 * 60 * 1000; // 11 minutos
+export const SERVER_DEVICE_PATTERN = /servidor(_central)?|server/i;
 
 const AlertsContext = createContext<AlertsContextType | undefined>(undefined);
 
@@ -494,11 +495,12 @@ export const AlertsProvider: React.FC<AlertsProviderProps> = ({
               await AsyncStorage.removeItem(`deviceAlert_${id}`);
             }
           }
+          const isServer = SERVER_DEVICE_PATTERN.test(id);
           initial[id] = {
             deviceId: id,
-            status: 'offline',
-            connected: false,
-            lastSeen: 0,
+            status: isServer ? 'online' : 'offline',
+            connected: isServer,
+            lastSeen: isServer ? Date.now() : 0,
             deviceType: serverTypes[id],
             lastAlertType,
           };
@@ -506,11 +508,12 @@ export const AlertsProvider: React.FC<AlertsProviderProps> = ({
         // Inclui quaisquer devices que só existam no servidor (têm tipo mas não estão em knownIds)
         Object.keys(serverTypes).forEach((id) => {
           if (!initial[id]) {
+            const isServer = SERVER_DEVICE_PATTERN.test(id);
             initial[id] = {
               deviceId: id,
-              status: 'offline',
-              connected: false,
-              lastSeen: 0,
+              status: isServer ? 'online' : 'offline',
+              connected: isServer,
+              lastSeen: isServer ? Date.now() : 0,
               deviceType: serverTypes[id],
             };
           }
@@ -726,6 +729,7 @@ export const AlertsProvider: React.FC<AlertsProviderProps> = ({
   const getNewDevices = (): DeviceStatus[] => {
     return Object.values(devicesById).filter(device => {
       if (device.deviceType) return false; // já tipados não são "novos"
+      if (SERVER_DEVICE_PATTERN.test(device.deviceId)) return false; // o servidor nunca entra aqui
       if (!device.connected) return false; // requer conexão ativa
       // Heurística para excluir apps: exigir sinais típicos de hardware (métricas ou alertas)
       const hasMetrics = (

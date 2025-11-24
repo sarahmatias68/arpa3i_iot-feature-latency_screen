@@ -1,7 +1,7 @@
-import { View, Text, StyleSheet, StatusBar, TouchableOpacity, ScrollView } from 'react-native';
-import { useMemo, useState } from 'react';
+import { View, Text, StyleSheet, StatusBar, TouchableOpacity, ScrollView, Modal } from 'react-native';
+import { useMemo, useState, useEffect, useRef } from 'react';
 import { Ionicons } from '@expo/vector-icons';
-import { useAlerts } from './AlertsContext';
+import { useAlerts, SERVER_DEVICE_PATTERN } from './AlertsContext';
 import { ConnectionStatusBanner } from './ConnectionStatusBanner';
 import DeviceTypeSelector from './DeviceTypeSelector';
 import { getTheme, typography } from './theme';
@@ -17,12 +17,37 @@ export default function MainScreen({ navigation, user, themeName = 'dark' }) {
     acknowledgeAlert,
     activeAlert,
     dismissActiveAlert,
+    devicesById,
+    requestSystemBroadcast,
   } = useAlerts();
 
   const [typeSelectorVisible, setTypeSelectorVisible] = useState(false);
   const [selectedDeviceId, setSelectedDeviceId] = useState(null);
+  const [serverExpanded, setServerExpanded] = useState(false);
   const theme = useMemo(() => getTheme(themeName), [themeName]);
   const styles = useMemo(() => createStyles(theme), [theme]);
+
+  // Detecta o dispositivo do servidor central por nome (servidor/server)
+  const serverDevice = useMemo(() => {
+    if (!devicesById) return null;
+    const ids = Object.keys(devicesById);
+    const matchId = ids.find(id => SERVER_DEVICE_PATTERN.test(id));
+    return matchId ? devicesById[matchId] : null;
+  }, [devicesById]);
+
+  // Modal de desconexão do servidor: aparece quando status muda para "Desconectado"
+  const [showDisconnectModal, setShowDisconnectModal] = useState(false);
+  const prevStatusRef = useRef(connectionStatus);
+  useEffect(() => {
+    if (prevStatusRef.current !== connectionStatus) {
+      if (connectionStatus === 'Desconectado') {
+        setShowDisconnectModal(true);
+      } else if (connectionStatus === 'Conectado') {
+        setShowDisconnectModal(false);
+      }
+      prevStatusRef.current = connectionStatus;
+    }
+  }, [connectionStatus]);
 
   const getColorForSensorState = (state) => {
     switch (state) {
@@ -210,6 +235,55 @@ export default function MainScreen({ navigation, user, themeName = 'dark' }) {
     );
   };
   
+  const renderServerCard = () => {
+    const statusText = connectionStatus;
+    const statusColor = connectionStatus === 'Conectado' ? '#22c55e' : connectionStatus === 'Conectando...' ? '#facc15' : '#ef4444';
+
+    return (
+      <TouchableOpacity
+        style={styles.serverCard}
+        onPress={() => setServerExpanded(prev => !prev)}
+        activeOpacity={0.85}
+      >
+        <View style={styles.serverHeaderRow}>
+          <Ionicons name="server-outline" size={36} color={theme.colors.primary} style={styles.serverIcon} />
+          <Text style={styles.serverHeader}>Servidor Central</Text>
+          <Text style={[styles.serverStatus, { color: statusColor }]}>Status: {statusText}</Text>
+        </View>
+
+        {serverExpanded && (
+          <View style={[styles.deviceInfoBlock, styles.serverMetricsBlock]}>
+            {typeof serverDevice?.uptimeSec === 'number' && (
+              <Text style={[styles.deviceInfoText, styles.serverMetricText]}>
+                Uptime: {Math.floor(serverDevice.uptimeSec/3600)}h {Math.floor((serverDevice.uptimeSec%3600)/60)}m
+              </Text>
+            )}
+            {typeof serverDevice?.heapB === 'number' && (
+              <Text style={[styles.deviceInfoText, styles.serverMetricText]}>Heap: {serverDevice.heapB} B</Text>
+            )}
+            {typeof serverDevice?.tempCpuC === 'number' && (
+              <Text style={[styles.deviceInfoText, styles.serverMetricText]}>CPU: {serverDevice.tempCpuC}°C</Text>
+            )}
+            {typeof serverDevice?.rssiDbm === 'number' && (
+              <Text style={[styles.deviceInfoText, styles.serverMetricText]}>WiFi: {serverDevice.rssiDbm} dBm</Text>
+            )}
+            {typeof serverDevice?.reconnects === 'number' && (
+              <Text style={[styles.deviceInfoText, styles.serverMetricText]}>Reconexões: {serverDevice.reconnects}</Text>
+            )}
+            {typeof serverDevice?.lastSeen === 'number' && serverDevice.lastSeen > 0 && (
+              <Text style={[styles.deviceInfoText, styles.serverMetricText]}>
+                Atualizado há {Math.max(0, Math.floor((Date.now() - serverDevice.lastSeen)/1000))}s
+              </Text>
+            )}
+            {!serverDevice && (
+              <Text style={[styles.deviceInfoText, styles.serverMetricText]}>Nenhuma métrica disponível.</Text>
+            )}
+          </View>
+        )}
+      </TouchableOpacity>
+    );
+  };
+  
   return (
     <View style={styles.container}>
       <StatusBar barStyle={themeName === 'light' ? 'dark-content' : 'light-content'} />
@@ -220,6 +294,7 @@ export default function MainScreen({ navigation, user, themeName = 'dark' }) {
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
       >
+        {renderServerCard()}
         {newDevices.length > 0 && (
           <View style={styles.newDevicesSection}>
             <View style={styles.newDevicesHeaderRow}>
@@ -278,7 +353,30 @@ export default function MainScreen({ navigation, user, themeName = 'dark' }) {
         )}
       </ScrollView>
 
-      
+      {/* Modal de desconexão do servidor */}
+      <Modal
+        visible={showDisconnectModal}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setShowDisconnectModal(false)}
+      >
+        <View style={styles.alertOverlay}>
+          <View style={styles.alertBox}>
+            <Text style={styles.alertTitle}>Servidor desconectou</Text>
+            <Text style={styles.alertMessage}>App indisponível no momento.</Text>
+            <TouchableOpacity
+              style={styles.alertButton}
+              onPress={() => {
+                setShowDisconnectModal(false);
+                // Solicita broadcast como tentativa de recuperar status ao reconectar
+                try { requestSystemBroadcast?.(); } catch (e) {}
+              }}
+            >
+              <Text style={styles.alertButtonText}>OK</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
 
       <DeviceTypeSelector
         visible={typeSelectorVisible}
@@ -315,6 +413,40 @@ const createStyles = (theme) => StyleSheet.create({
     marginBottom: 20,
     borderWidth: 1,
     borderColor: theme.colors.border,
+  },
+  serverCard: {
+    backgroundColor: theme.colors.card,
+    borderRadius: 12,
+    padding: 20,
+    width: '90%',
+    maxWidth: 400,
+    marginBottom: 20,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+  },
+  serverHeaderRow: {
+    flexDirection: 'column',
+    alignItems: 'center',
+    gap: 10,
+  },
+  serverIcon: {
+    marginBottom: 4,
+  },
+  serverHeader: {
+    ...typography.h3,
+    color: theme.colors.text,
+    textAlign: 'center',
+  },
+  serverStatus: {
+    ...typography.smallStrong,
+    marginTop: 4,
+    textAlign: 'center',
+  },
+  serverMetricsBlock: {
+    alignItems: 'center',
+  },
+  serverMetricText: {
+    textAlign: 'center',
   },
   newDevicesHeader: {
     ...typography.h3,
