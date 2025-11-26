@@ -13,7 +13,7 @@ const UserDataScreen = ({ user, themeName = 'dark' }) => {
   const styles = useMemo(() => createStyles(theme), [theme]);
 
   useEffect(() => {
-    console.log('Dados do usuário recebidos na tela Meus Dados:', JSON.stringify(user, null, 2)); // Log para depuração
+    console.log('Dados do cuidador recebidos na tela Meus Dados:', JSON.stringify(user, null, 2)); // Log para depuração
     if (user) {
       setName(user.name);
       setEmail(user.email);

@@ -1,4 +1,4 @@
-// v26 - Versão Servidor Central (Atualização de Broadcast)
+// v25 - Versão Servidor Central (Atualização de Broadcast)
 // - Adicionados novos tipos de alerta: POSSIVEL_QUEDA e FALHA_SENSOR.
 // - Funções de broadcast atualizadas para notificar App e Vercel corretamente.
 // - Mantida compatibilidade com clientes antigos.
@@ -15,249 +15,144 @@
 #include <map>
 #include <HTTPClient.h>
 #include <WiFiClientSecure.h>
-#include <Ticker.h>
-#include <ESPmDNS.h>
-#include <WiFiUdp.h>
-#include <ArduinoOTA.h>
-#include <Preferences.h>
 
 // --- CONFIGURAÇÕES ---
 const int SD_CS_PIN = 5;
-const int BUTTON_PIN = 0;
-const int LED_PIN = 26; // Certifique-se que é 26 ou 2 dependendo da sua placa
+const int BACKUP_BUTTON_PIN = 27;
 const char *ntpServer = "pool.ntp.org";
-const long gmtOffset_sec = -10800; // GMT-3
+const long gmtOffset_sec = -10800;  // GMT-3
 const int daylightOffset_sec = 0;
 const int WDT_TIMEOUT_S = 10;
 const char *vercelServerUrl = "https://vercel-arpa3i.vercel.app/api/alert";
 
-// --- 1. DEFINIÇÃO DO ENUM (TEM QUE SER AQUI EM CIMA) ---
-enum DeviceStatus {
-  SYS_CONFIG_AP,   // Pisca Lento (1s) - Modo Configuração
-  SYS_CONNECTING,  // Pisca Rápido (250ms) - Tentando conectar
-  SYS_ONLINE,      // Heartbeat (Pulso a cada 5s) - Operação Normal
-  SYS_ALERT_SENT,  // Pisca Médio (500ms) - Alerta disparado
-  SYS_ERROR,       // Estrobo (100ms) - Erro Crítico
-  SYS_UPDATING     // Aceso Fixo - Gravando OTA
-};
-
-// --- 2. VARIÁVEIS GLOBAIS ---
-const char *myApiKey = "f4b3c2d1-a6e5-4f78-9b9c-8e0d3a2b1c0f-arpa3i"; 
+// --- VARIÁVEIS GLOBAIS ---
+const char *myApiKey = "f4b3c2d1-a6e5-4f78-9b9c-8e0d3a2b1c0f-arpa3i";  // Sua chave de API
 AsyncWebServer server(86);
 AsyncWebSocket ws("/ws");
 std::map<uint32_t, String> clientDeviceIds;
-std::map<String, String> childGatewayMap;
+std::map<String, String> childGatewayMap;  // <--- ADICIONE ISTO (Mapeia Filho -> Pai)
 unsigned long ultimoPing = 0;
 
-// --- CONFIGURAÇÃO DO SERVIDOR ---
-char deviceId[40] = "Servidor_Central"; 
-Preferences preferences;
-bool shouldSaveConfig = false;
-
-// --- LEDS ---
-Ticker ledTicker;  
-Ticker pulseTicker; 
-const bool LED_ON_STATE = HIGH;
-
-// --- DEMAIS VARIÁVEIS ---
+// --- VARIÁVEIS PARA LOG DE ALERTA ASSÍNCRONO ---
 volatile bool alertPending = false;
 String pendingAlertType;
 String pendingAlertMessage;
-bool isOtaUpdating = false;
+volatile bool g_broadcastPending = false;
+String g_broadcastMessage;
 
-// --- BANCO DE DADOS ---
+// --- VARIÁVEIS GLOBAIS ADICIONAIS ---
+bool cloudServerAvailable = true;
+int failedCloudConnections = 0;
+const int maxFailedConnections = 5;
+
+// --- CONFIGURAÇÕES DO BANCO DE DADOS E BACKUP ---
 sqlite3 *db;
 const char *db_path = "/sd/arpa3i_data.db";
 const char *db_backup_path = "/sd/arpa3i_data.db.bak";
 unsigned long last_backup_time = 0;
-const unsigned long backup_interval = 3600000;
+const unsigned long backup_interval = 3600000;  // 1 hora
 
-// --- BOTÃO ---
+// --- CONTROLE DO BOTÃO DE BACKUP ---
 int buttonState = HIGH;
-int lastButtonState = HIGH;
+int lastBackupButtonState = HIGH;
 unsigned long lastDebounceTime = 0;
 const long debounceDelay = 50;
-unsigned long buttonPressStartTime = 0;
-bool longPressActionTaken = false;
-const long longPressDuration = 5000;
 
-// --- 3. PROTÓTIPOS (IMPORTANTE PARA O ARDUINO ENTENDER A ORDEM) ---
-// Adicione o protótipo da função setSystemStatus aqui para garantir
-void setSystemStatus(DeviceStatus status); 
-
-// ... (Seus outros protótipos: setupWebSocket, enviarStatusServidor, etc) ...
+// --- PROTÓTIPOS ---
 void setupWebSocket();
-void enviarStatusServidor();
+void enviarPing();
 void initDatabase();
-// ... etc ...
+void handleUserResetPassword(AsyncWebServerRequest *request);
+void logAlert(const char *alertType, const char *message);
+void handleAlertLogging();
+void handleBackupButton();
+void handleBroadcasts();
+String getFormattedTime();
+void WiFiEvent(WiFiEvent_t event, WiFiEventInfo_t info);
+void onEvent(AsyncWebSocket *server, AsyncWebSocketClient *client, AwsEventType type, void *arg, uint8_t *data, size_t len);
+int db_exec(sqlite3 *db, const char *sql);
+bool copyFile(const char *srcPath, const char *destPath);
+void performBackup();
+void handleBackup();
+void handleLogin(AsyncWebServerRequest *request);
+void handleUsersGet(AsyncWebServerRequest *request);
+void handleUserAdd(AsyncWebServerRequest *request);
+void handleUserUpdate(AsyncWebServerRequest *request);
+void handleUserDelete(AsyncWebServerRequest *request);
+void handleElderlyGet(AsyncWebServerRequest *request);
+void handleElderlyAdd(AsyncWebServerRequest *request);
+void handleElderlyUpdate(AsyncWebServerRequest *request);
+void handleDevicesGet(AsyncWebServerRequest *request);
+void handleDevicesSet(AsyncWebServerRequest *request);
+void handleDevicesDelete(AsyncWebServerRequest *request);
+void handleAlertsGet(AsyncWebServerRequest *request);
+void handleAcknowledgeAlert(AsyncWebServerRequest *request);
+void broadcastFallAlert(String local, String dispositivo);
+void broadcastPanicAlert(String dispositivo);
+void broadcastGasAlert(String local, String dispositivo);
+void broadcastSmokeAlert(String local, String dispositivo);
+// NOVOS PROTÓTIPOS v25
+void broadcastPossibleFallAlert(String local, String dispositivo);
+void broadcastSensorFailureAlert(String local, String dispositivo);
+// ---
+bool acknowledgeLatestAlert(String user);
+void sendAckToClient(AsyncWebSocketClient *client, const char *alertType);
+void enviarAlertaVercel(String tipoAlerta, String local, String dispositivo);
+String urlEncode(String str);
+bool testCloudConnection();
+void resetFailedConnectionCounter();
 
-// --- 4. FUNÇÕES DE CALLBACK ---
-void saveConfigCallback() {
-  Serial.println("Deve salvar as configuracoes...");
-  shouldSaveConfig = true;
-}
-
-// --- 5. IMPLEMENTAÇÃO DAS FUNÇÕES DO LED ---
-void _tickToggle() {
-  digitalWrite(LED_PIN, !digitalRead(LED_PIN));
-}
-
-void _tickHeartbeat() {
-  digitalWrite(LED_PIN, LED_ON_STATE); 
-  pulseTicker.once_ms(50, +[]() {
-      digitalWrite(LED_PIN, !LED_ON_STATE); 
-  });
-}
-
-void setSystemStatus(DeviceStatus status) {
-  ledTicker.detach();
-  pulseTicker.detach();
-
-  if (status != SYS_UPDATING) {
-    digitalWrite(LED_PIN, !LED_ON_STATE);
-  }
-
-  switch (status) {
-    case SYS_CONFIG_AP:   ledTicker.attach(1.0, _tickToggle); break;
-    case SYS_CONNECTING:  ledTicker.attach(0.25, _tickToggle); break;
-    case SYS_ALERT_SENT:  ledTicker.attach(0.5, _tickToggle); break;
-    case SYS_ERROR:       ledTicker.attach(0.1, _tickToggle); break;
-    case SYS_ONLINE:      ledTicker.attach(5.0, _tickHeartbeat); break;
-    case SYS_UPDATING:    digitalWrite(LED_PIN, LED_ON_STATE); break;
-  }
-}
 
 void wifiManagerCallback(WiFiManager *myWiFiManager) {
   Serial.println("Entrou no modo de configuracao do AP... alimentando o watchdog.");
-  setSystemStatus(SYS_CONFIG_AP);
-}
-
-void setupOTA() {
-  ArduinoOTA.setHostname(deviceId);
-  ArduinoOTA.setPassword("123");
-
-  ArduinoOTA.onStart([]() {
-    String type = (ArduinoOTA.getCommand() == U_FLASH) ? "sketch" : "filesystem";
-    Serial.println("Iniciando OTA (" + type + ")...");
-
-    isOtaUpdating = true;
-
-    setSystemStatus(SYS_UPDATING);
-
-    ws.enable(false);
-
-    Serial.println("Sistema travado para atualizacao.");
-  });
-
-  ArduinoOTA.onEnd([]() {
-    Serial.println("\nFim do OTA. Reiniciando...");
-    isOtaUpdating = false;
-  });
-
-  ArduinoOTA.onProgress([](unsigned int progress, unsigned int total) {
-    // IMPORTANTE: Alimenta o Watchdog DURANTE a gravação
-    // Isso evita que o chip reinicie achando que travou
-    esp_task_wdt_reset();
-  });
-
-  ArduinoOTA.onError([](ota_error_t error) {
-    Serial.printf("Erro OTA[%u]: ", error);
-    isOtaUpdating = false;  // Destrava se der erro
-    ESP.restart();
-  });
-
-  ArduinoOTA.begin();
-  Serial.println("OTA Ativo.");
+  //esp_task_wdt_reset();
 }
 
 void setup() {
   Serial.begin(115200);
+  pinMode(BACKUP_BUTTON_PIN, INPUT_PULLUP);
 
-  pinMode(BUTTON_PIN, INPUT_PULLUP);
-  pinMode(LED_PIN, OUTPUT);
-  
-  // 1. Inicia LED piscando (Tentando conectar/boot)
-  setSystemStatus(SYS_CONNECTING);
-
-  // 2. Carrega ID Salvo (Preferences - Memória Interna)
-  preferences.begin("server-config", true); // Modo Leitura
-  String savedId = preferences.getString("deviceId", "");
-  if (savedId != "") {
-    strlcpy(deviceId, savedId.c_str(), sizeof(deviceId));
-    Serial.println("ID do Servidor carregado: " + String(deviceId));
-  }
-  preferences.end();
-
-  // 3. Limpeza WiFi inicial para evitar loops
-  WiFi.mode(WIFI_STA);
-  WiFi.disconnect();
-  delay(100);
-
-  // 4. Inicializa SD (Crítico)
   if (!SD.begin(SD_CS_PIN)) {
-    Serial.println("Falha SD!");
-    setSystemStatus(SYS_ERROR);
-    // Loop infinito com LED de erro se não tiver SD
-    while (1) { delay(1000); }
+    Serial.println("Falha na inicializacao do Cartao SD!");
+    while (1)
+      ;
   }
-  Serial.println("SD OK.");
-
-  // 5. Inicializa Banco de Dados
+  Serial.println("Cartao SD inicializado.");
   initDatabase();
   WiFi.onEvent(WiFiEvent);
 
-  // 6. Configura WiFiManager com Parâmetro Customizado
   WiFiManager wm;
   wm.setAPCallback(wifiManagerCallback);
-  wm.setSaveConfigCallback(saveConfigCallback); // Avisa se salvaram algo
   wm.setConfigPortalTimeout(180);
-
-  // Cria o campo de texto para editar o ID
-  WiFiManagerParameter custom_server_id("serverid", "ID do Servidor", deviceId, 40);
-  wm.addParameter(&custom_server_id);
-
-  // Cria nome do AP único (Servidor_Arpa3i_XXXX)
-  String mac = WiFi.macAddress();
-  mac.replace(":", "");
-  String apName = "Servidor_Arpa3i_" + mac.substring(8);
-
-  // Tenta conectar
-  if (!wm.autoConnect(apName.c_str())) {
-    Serial.println("Falha ao conectar. Reiniciando...");
-    setSystemStatus(SYS_ERROR);
+  if (!wm.autoConnect("ServidorArpa3iAP")) {
+    Serial.println("Falha ao conectar e o tempo de configuração expirou. Reiniciando...");
     delay(3000);
     ESP.restart();
   }
+  Serial.println("\nConectado ao Wi-Fi!");
+  delay(500);
+  Serial.println("IP: " + WiFi.localIP().toString());
 
-  // 7. Salva o novo ID se foi alterado no portal
-  if (shouldSaveConfig) {
-    strcpy(deviceId, custom_server_id.getValue());
-    Serial.println("Salvando novo ID na memoria: " + String(deviceId));
-    
-    preferences.begin("server-config", false); // Modo Escrita
-    preferences.putString("deviceId", deviceId);
-    preferences.end();
-  }
-
-  // 8. Conectado com sucesso!
-  setSystemStatus(SYS_ONLINE);
-  Serial.println("\nConectado! IP: " + WiFi.localIP().toString());
-
-  // 9. Sincronia de Tempo (NTP)
   configTime(gmtOffset_sec, daylightOffset_sec, ntpServer);
-  
-  // Pequena espera pelo NTP (opcional, mas bom para logs)
+  Serial.println("Aguardando sincronizacao do NTP...");
   struct tm timeinfo;
   long startTime = millis();
-  while ((!getLocalTime(&timeinfo) || timeinfo.tm_year < 120) && (millis() - startTime < 5000)) {
+  const long ntpTimeout = 10000;
+  while ((!getLocalTime(&timeinfo) || timeinfo.tm_year < 120) && (millis() - startTime < ntpTimeout)) {
     delay(100);
   }
-  
-  // 10. Inicia Servidor e WebSocket
+
+  if (millis() - startTime >= ntpTimeout) {
+    Serial.println("Timeout! Nao foi possivel sincronizar o NTP.");
+    logAlert("ERRO_NTP", "Falha ao sincronizar NTP na inicializacao");
+  } else {
+    Serial.println("NTP sincronizado com sucesso.");
+    logAlert("INFO", ("Sistema iniciado. IP: " + WiFi.localIP().toString()).c_str());
+  }
+
   setupWebSocket();
-  
-  // Rotas HTTP (API)
   DefaultHeaders::Instance().addHeader("Access-Control-Allow-Origin", "*");
+
   server.on("/login", HTTP_POST, handleLogin);
   server.on("/users", HTTP_GET, handleUsersGet);
   server.on("/users/add", HTTP_POST, handleUserAdd);
@@ -269,45 +164,30 @@ void setup() {
   server.on("/elderly/update", HTTP_POST, handleElderlyUpdate);
   server.on("/alerts", HTTP_GET, handleAlertsGet);
   server.on("/acknowledge", HTTP_POST, handleAcknowledgeAlert);
+
+  // --- Rotas de Gerenciamento de Dispositivos ---
   server.on("/devices", HTTP_GET, handleDevicesGet);
   server.on("/devices/set", HTTP_POST, handleDevicesSet);
   server.on("/devices/delete", HTTP_POST, handleDevicesDelete);
 
+  // --- Configuração CORS ---
   DefaultHeaders::Instance().addHeader("Access-Control-Allow-Methods", "GET,POST,OPTIONS");
   DefaultHeaders::Instance().addHeader("Access-Control-Allow-Headers", "Content-Type");
   server.begin();
-  
-  // 11. Inicia OTA (Usando o deviceId carregado)
-  setupOTA(); 
+  Serial.println("\n--- Servidor Arpa3i v25 Iniciado ---");
 
-  Serial.println("--- Servidor Iniciado (" + String(deviceId) + ") ---");
-
-  // 12. Inicia Watchdog
   esp_task_wdt_config_t wdt_config = { .timeout_ms = (uint32_t)(WDT_TIMEOUT_S * 1000), .trigger_panic = true };
   esp_task_wdt_init(&wdt_config);
   esp_task_wdt_add(NULL);
 }
 
 void loop() {
-  // 1. VERIFICAÇÃO OTA (Prioridade Absoluta)
-  ArduinoOTA.handle();
-
-  // --- TRAVA DE SEGURANÇA ---
-  // Se o update começou, NÃO FAÇA MAIS NADA.
-  // Retorna imediatamente para dar 100% de CPU ao OTA e evitar conflitos de SD/WiFi.
-  if (isOtaUpdating) {
-    esp_task_wdt_reset();  // Mantém o cão alimentado
-    return;                // <--- PULA O RESTO DO CÓDIGO
-  }
-  // --------------------------
-
-  // 2. Watchdog e Tarefas Normais (Só rodam se NÃO estiver atualizando)
   esp_task_wdt_reset();
-
-  enviarStatusServidor();
+  enviarPing();
   handleAlertLogging();
   handleBackup();
-  handleButton();
+  handleBackupButton();
+  handleBroadcasts();
   ws.cleanupClients();
 }
 
@@ -337,7 +217,7 @@ void onEvent(AsyncWebSocket *server, AsyncWebSocketClient *client, AwsEventType 
       String logMsg = "Dispositivo principal desconectado: " + deviceId;
       logAlert("FALHA_SENSOR", logMsg.c_str());
       broadcastSensorFailureAlert("Conexao WebSocket perdida", deviceId);
-
+      
       for (auto const &[child, parent] : childGatewayMap) {
         if (parent == deviceId) {
           Serial.printf(">>> CASCATA: O pai '%s' caiu. Derrubando o filho '%s'...\n", deviceId.c_str(), child.c_str());
@@ -650,64 +530,19 @@ bool acknowledgeLatestAlert(String user) {
   return success;
 }
 
-void triggerFactoryReset() {
-  Serial.println("\n>>> RESET DE FABRICA INICIADO <<<");
-
-  setSystemStatus(SYS_ERROR);
-
-  WiFiManager wm;
-  wm.resetSettings();
-
-  WiFi.disconnect(true);
-  WiFi.mode(WIFI_OFF);
-
-  Serial.println("Configuracoes apagadas. O sistema reiniciara em 3 segundos...");
-
-  delay(3000);
-
-  ESP.restart();
-}
-
-void handleButton() {
-  int reading = digitalRead(BUTTON_PIN);
-
-  if (reading != lastButtonState) {
-    lastDebounceTime = millis();
-  }
-
+void handleBackupButton() {
+  int reading = digitalRead(BACKUP_BUTTON_PIN);
+  if (reading != lastBackupButtonState) { lastDebounceTime = millis(); }
   if ((millis() - lastDebounceTime) > debounceDelay) {
     if (reading != buttonState) {
       buttonState = reading;
-
       if (buttonState == LOW) {
-        // --- APERTOU ---
-        buttonPressStartTime = millis();
-        longPressActionTaken = false;
-        Serial.println("Botao BOOT pressionado...");
-      } else {
-        // --- SOLTOU ---
-        unsigned long pressDuration = millis() - buttonPressStartTime;
-
-        if (!longPressActionTaken) {
-          // Clique Simples (< 5s): BACKUP
-          // (Removemos a lógica de 2s a 5s do OTA, agora tudo abaixo de 5s é backup ou ignorado)
-          if (pressDuration < 5000 && pressDuration > 100) {
-            Serial.println("\n>>> ACAO: Backup Manual <<<");
-            performBackup();
-          }
-        }
+        Serial.println("\n>>> BOTAO DE BACKUP PRESSIONADO. FORCANDO EXECUCAO. <<<");
+        performBackup();
       }
     }
   }
-
-  // Reset de Fábrica (> 5s segurando)
-  if (buttonState == LOW && !longPressActionTaken) {
-    if (millis() - buttonPressStartTime > longPressDuration) {  // 5000ms
-      longPressActionTaken = true;
-      triggerFactoryReset();
-    }
-  }
-  lastButtonState = reading;
+  lastBackupButtonState = reading;
 }
 
 void handleAlertLogging() {
@@ -719,30 +554,21 @@ void handleAlertLogging() {
   }
 }
 
-void enviarStatusServidor() {
-  // Envia a cada 15 segundos
-  if (millis() - ultimoPing > 15000) {
-    
-    // PADRONIZAÇÃO: Buffer aumentado para 512 (Segurança/Roadmap)
-    StaticJsonDocument<512> doc;
-    
-    doc["type"] = "DEVICE_STATUS";
-    doc["deviceId"] = deviceId;
-    doc["status"] = "online";
-    doc["uptimeSec"] = (long)(millis() / 1000);
-    doc["rssiDbm"] = (int)WiFi.RSSI();
-    doc["heapB"] = (long)ESP.getFreeHeap();
-    doc["ip"] = WiFi.localIP().toString();
-  
-    float temp = temperatureRead();
-    if (!isnan(temp)) {
-       doc["tempCpuC"] = (float)(round(temp * 10) / 10.0);
-    }
-    // ----------------------------------------------------------
+void handleBroadcasts() {
+  if (g_broadcastPending) {
+    Serial.println(">>> Retransmitindo SYSTEM_BROADCAST (do loop): " + g_broadcastMessage);
+    ws.textAll(g_broadcastMessage);
 
-    String json;
-    serializeJson(doc, json);
-    ws.textAll(json);
+    // Limpa a fila
+    g_broadcastMessage = "";
+    g_broadcastPending = false;
+  }
+}
+
+void enviarPing() {
+  if (millis() - ultimoPing > 10000) {
+    // Envia um frame de DADOS (string)
+    ws.textAll("{\"type\":\"ping\"}");
     ultimoPing = millis();
   }
 }
@@ -819,6 +645,90 @@ void enviarAlertaVercel(String tipoAlerta, String local, String dispositivo) {
   if (!success) {
     Serial.println("Falha após todas as tentativas de envio do alerta.");
     logAlert("ERRO_ENVIO", ("Falha no envio de alerta " + tipoAlerta).c_str());
+  }
+}
+
+
+String urlEncode(String str) {
+  String encodedString = "";
+  char c;
+  char code0;
+  char code1;
+  for (int i = 0; i < str.length(); i++) {
+    c = str.charAt(i);
+    if (c == ' ') {
+      encodedString += '+';
+    } else if (isalnum(c)) {
+      encodedString += c;
+    } else {
+      code1 = (c & 0xf) + '0';
+      if ((c & 0xf) > 9) {
+        code1 = (c & 0xf) - 10 + 'A';
+      }
+      c = (c >> 4) & 0xf;
+      code0 = c + '0';
+      if (c > 9) {
+        code0 = c - 10 + 'A';
+      }
+      encodedString += '%';
+      encodedString += code0;
+      encodedString += code1;
+    }
+  }
+  return encodedString;
+}
+
+bool testCloudConnection() {
+  if (WiFi.status() != WL_CONNECTED) {
+    Serial.println("WiFi desconectado. Não é possível testar conexão com servidor.");
+    return false;
+  }
+
+  WiFiClientSecure client;
+  HTTPClient http;
+
+  String testUrl = String(vercelServerUrl);
+  testUrl.replace("/api/alert", "/api/");
+  Serial.print("Testando conexão com servidor (rota GET /api/): ");
+  Serial.println(testUrl);
+
+  client.setInsecure();
+
+  http.begin(client, testUrl);
+  http.setTimeout(5000);
+  // Timeout de 5 segundos
+  int httpResponseCode = http.GET();
+  bool success = (httpResponseCode == 200);
+  if (success) {
+    Serial.print("Conexão com servidor bem-sucedida. Código: ");
+    Serial.println(httpResponseCode);
+    String response = http.getString();
+    Serial.println("Resposta: " + response);
+    resetFailedConnectionCounter();
+  } else {
+    Serial.print("Falha na conexão com servidor. Erro: ");
+    Serial.println(httpResponseCode);
+    failedCloudConnections++;
+
+    if (failedCloudConnections >= maxFailedConnections) {
+      cloudServerAvailable = false;
+      Serial.println("Servidor em nuvem marcado como indisponível após falhas consecutivas.");
+      logAlert("ERRO_SERVIDOR", "Servidor em nuvem indisponível após múltiplas falhas");
+    }
+  }
+
+  http.end();
+  return success;
+}
+
+void resetFailedConnectionCounter() {
+  if (failedCloudConnections > 0) {
+    failedCloudConnections = 0;
+    if (!cloudServerAvailable) {
+      cloudServerAvailable = true;
+      Serial.println("Servidor em nuvem marcado como disponível novamente.");
+      logAlert("INFO", "Conexão com servidor em nuvem restaurada");
+    }
   }
 }
 
@@ -1182,22 +1092,12 @@ void setupWebSocket() {
 }
 
 void WiFiEvent(WiFiEvent_t event, WiFiEventInfo_t info) {
-  // Caso 1: Desconectou
   if (event == ARDUINO_EVENT_WIFI_STA_DISCONNECTED) {
-    
     if (!alertPending) {
       pendingAlertType = "WIFI";
       pendingAlertMessage = "Conexao Wi-Fi perdida.";
       alertPending = true;
     }
-    // Atualiza o LED para o novo padrão (Pisca Rápido)
-    setSystemStatus(SYS_CONNECTING);
-  }
-
-  // Caso 2: Conectou e Pegou IP
-  else if (event == ARDUINO_EVENT_WIFI_STA_GOT_IP) {
-    // Atualiza o LED para o novo padrão (Heartbeat/Online)
-    setSystemStatus(SYS_ONLINE);
   }
 }
 

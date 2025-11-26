@@ -29,7 +29,7 @@ export default function LogsScreen({ route, user, themeName = 'dark' }) {
     return (
       <View style={styles.container_loader}>
         <ActivityIndicator size="large" color={theme.colors.text} />
-        <Text style={styles.loader_text}>Carregando dados do usuário...</Text>
+        <Text style={styles.loader_text}>Carregando dados do cuidador...</Text>
       </View>
     );
   }

@@ -7,7 +7,7 @@ const SettingsScreen = ({ navigation, onLogout, themeName = 'dark', onChangeThem
   const theme = useMemo(() => getTheme(themeName), [themeName]);
   const styles = useMemo(() => createStyles(theme), [theme]);
   const menuItems = [
-    { title: 'Dados do Usuário', screen: 'UserData', icon: 'person-circle-outline' },
+    { title: 'Dados do Cuidador', screen: 'UserData', icon: 'person-circle-outline' },
     { title: 'Dados do Idoso', screen: 'ElderlyData', icon: 'body-outline' },
     { title: 'Gerenciar Usuários', screen: 'UserList', icon: 'people-outline' },
     { title: 'Dispositivos', screen: 'DeviceRegistry', icon: 'list-outline' },
