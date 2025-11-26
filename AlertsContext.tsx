@@ -88,8 +88,8 @@ interface AlertsContextType {
   alertsQueue: AlertItem[];
 }
 
-const WEBSOCKET_URL = "ws://192.168.2.115:86/ws";
-const SERVER_HTTP_BASE = "http://192.168.2.115:86";
+const WEBSOCKET_URL = "ws://192.168.1.115:86/ws";
+const SERVER_HTTP_BASE = "http://192.168.1.115:86";
 const DEVICE_TIMEOUT_MS = 11 * 60 * 1000; // 11 minutos
 export const SERVER_DEVICE_PATTERN = /servidor(_central)?|server/i;
 
@@ -145,39 +145,6 @@ export const AlertsProvider: React.FC<AlertsProviderProps> = ({
     const handlers = {
       onOpen: () => {
         setConnectionStatus("Conectado");
-        // --- NOVO: Enviar identificação com Primeiro Nome ---
-        if (ws.current?.ws) {
-            // Usa ID persistido; se não houver, só define quando houver nome/e-mail
-            (async () => {
-              try {
-                let storedId = await AsyncStorage.getItem('appDeviceId');
-                if (!storedId) {
-                  const base = (user?.name && user.name.trim().length > 0)
-                    ? user.name.trim()
-                    : (user?.email?.split('@')[0] || '');
-                  if (!base) {
-                    // Sem dados do cuidador ainda: não envia identificação agora
-                    return;
-                  }
-                  const firstNameRaw = base.split(/\s+/)[0];
-                  const firstName = firstNameRaw
-                    .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
-                    .replace(/[^A-Za-z0-9_]/g, '');
-                  if (!firstName) return;
-                  storedId = `App_${firstName}`;
-                  await AsyncStorage.setItem('appDeviceId', storedId);
-                }
-                const identificationMsg = JSON.stringify({
-                  type: 'DEVICE_STATUS',
-                  deviceId: storedId,
-                  status: 'online',
-                });
-                ws.current.ws.send(identificationMsg);
-              } catch (e) {
-                console.warn('Falha ao enviar identificação inicial:', e);
-              }
-            })();
-        }
         // Inicializa o dispositivo virtual do sensor de gás e fumaça
         setDevicesById(prev => ({
           ...prev,
@@ -478,37 +445,6 @@ export const AlertsProvider: React.FC<AlertsProviderProps> = ({
       ws.current?.ws?.close();
     };
   }, [user, connect]);
-
-  // Reidentifica com primeiro nome quando ficar disponível após a conexão
-  useEffect(() => {
-    (async () => {
-      const sock = ws.current?.ws;
-      if (!sock || sock.readyState !== WebSocket.OPEN) return;
-      try {
-        const base = (user?.name && user.name.trim().length > 0)
-          ? user.name.trim()
-          : (user?.email?.split('@')[0] || 'Cuidador');
-        const firstNameRaw = base.split(/\s+/)[0];
-        const firstName = firstNameRaw
-          .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
-          .replace(/[^A-Za-z0-9_]/g, '') || 'Cuidador';
-        const newId = `App_${firstName}`;
-        let storedId = await AsyncStorage.getItem('appDeviceId');
-        if (!storedId || storedId !== newId) {
-          await AsyncStorage.setItem('appDeviceId', newId);
-          storedId = newId;
-        }
-        const identificationMsg = JSON.stringify({
-          type: 'DEVICE_STATUS',
-          deviceId: storedId,
-          status: 'online',
-        });
-        sock.send(identificationMsg);
-      } catch (e) {
-        // silencioso para não atrapalhar UI
-      }
-    })();
-  }, [user?.name, user?.email]);
 
   // Mantém activeAlert sempre refletindo o primeiro item da fila
   useEffect(() => {
