@@ -3,7 +3,7 @@ import { View, Text, StyleSheet, FlatList, ActivityIndicator, RefreshControl, Al
 import { useFocusEffect } from '@react-navigation/native';
 import { getTheme, typography } from './theme';
 
-const API_URL = 'http://192.168.1.115:86';
+const API_URL = 'http://192.168.2.115:86';
 
 const getAlertColor = (type, theme) => {
   switch (type) {

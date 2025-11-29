@@ -1,11 +1,31 @@
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView } from 'react-native';
-import { useMemo } from 'react';
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView, TextInput, Alert } from 'react-native';
+import { useMemo, useState, useEffect } from 'react';
 import { Ionicons } from '@expo/vector-icons';
 import { getTheme, typography } from './theme';
+import { useAlerts } from './AlertsContext';
 
 const SettingsScreen = ({ navigation, onLogout, themeName = 'dark', onChangeTheme }) => {
   const theme = useMemo(() => getTheme(themeName), [themeName]);
   const styles = useMemo(() => createStyles(theme), [theme]);
+  const { serverIp, serverPort, updateServerConfig, connectionStatus } = useAlerts();
+  const [ipInput, setIpInput] = useState('');
+  const [portInput, setPortInput] = useState('');
+
+  useEffect(() => {
+    setIpInput(serverIp || '');
+    setPortInput(String(serverPort || 86));
+  }, [serverIp, serverPort]);
+
+  const saveServerEndpoint = async () => {
+    const ip = (ipInput || '').trim();
+    const port = Number(portInput) || 86;
+    if (!ip) {
+      Alert.alert('IP inválido', 'Digite um endereço IP válido do servidor ESP.');
+      return;
+    }
+    await updateServerConfig(ip, port);
+    Alert.alert('Configuração salva', `Servidor definido para ${ip}:${port}. Estado: ${connectionStatus}`);
+  };
   const menuItems = [
     { title: 'Dados do Cuidador', screen: 'UserData', icon: 'person-circle-outline' },
     { title: 'Dados do Idoso', screen: 'ElderlyData', icon: 'body-outline' },
@@ -35,6 +55,32 @@ const SettingsScreen = ({ navigation, onLogout, themeName = 'dark', onChangeThem
         </TouchableOpacity>
       </View>
 
+      <Text style={styles.sectionTitle}>Servidor ESP</Text>
+      <View style={styles.serverBox}>
+        <Text style={styles.label}>Endereço IP</Text>
+        <TextInput
+          style={styles.input}
+          placeholder="ex: 192.168.0.100"
+          placeholderTextColor={theme.colors.muted}
+          value={ipInput}
+          onChangeText={setIpInput}
+          autoCapitalize="none"
+        />
+        <Text style={styles.label}>Porta</Text>
+        <TextInput
+          style={styles.input}
+          placeholder="ex: 86"
+          placeholderTextColor={theme.colors.muted}
+          value={portInput}
+          onChangeText={setPortInput}
+          keyboardType="numeric"
+        />
+        <TouchableOpacity style={styles.saveButton} onPress={saveServerEndpoint}>
+          <Ionicons name="save-outline" size={18} color={theme.colors.text} style={{ marginRight: 6 }} />
+          <Text style={styles.themeButtonText}>Salvar e Reconectar</Text>
+        </TouchableOpacity>
+      </View>
+
       <Text style={styles.sectionTitle}>Configurações</Text>
       {menuItems.map((item, index) => (
         <TouchableOpacity key={index} style={styles.menuItem} onPress={() => navigation.navigate(item.screen)}>
@@ -56,6 +102,14 @@ const createStyles = (theme) => StyleSheet.create({
     flex: 1,
     backgroundColor: theme.colors.background,
   },
+  serverBox: {
+    backgroundColor: theme.colors.card,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+    borderRadius: 8,
+    marginHorizontal: 15,
+    padding: 12,
+  },
   sectionTitle: {
     ...typography.smallStrong,
     color: theme.colors.textSecondary,
@@ -68,6 +122,22 @@ const createStyles = (theme) => StyleSheet.create({
     alignItems: 'center',
     gap: 8,
     paddingHorizontal: 15,
+    marginBottom: 10,
+  },
+  label: {
+    ...typography.smallStrong,
+    color: theme.colors.textSecondary,
+    marginBottom: 6,
+  },
+  input: {
+    width: '100%',
+    height: 44,
+    backgroundColor: theme.colors.card,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+    borderRadius: 8,
+    paddingHorizontal: 10,
+    color: theme.colors.text,
     marginBottom: 10,
   },
   themeButton: {
@@ -87,6 +157,18 @@ const createStyles = (theme) => StyleSheet.create({
   themeButtonText: {
     ...typography.smallStrong,
     color: theme.colors.text,
+  },
+  saveButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: theme.colors.primary,
+    borderWidth: 1,
+    borderColor: theme.colors.primary,
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    alignSelf: 'flex-start',
+    marginTop: 4,
   },
   menuItem: {
     flexDirection: 'row',
