@@ -275,6 +275,9 @@ export default function MainScreen({ navigation, user, themeName = 'dark' }) {
                 Atualizado há {Math.max(0, Math.floor((Date.now() - serverDevice.lastSeen)/1000))}s
               </Text>
             )}
+            {typeof serverDevice?.ip === 'string' && serverDevice.ip.length > 0 && (
+              <Text style={[styles.deviceInfoText, styles.serverMetricText]}>IP: {serverDevice.ip}</Text>
+            )}
             {!serverDevice && (
               <Text style={[styles.deviceInfoText, styles.serverMetricText]}>Nenhuma métrica disponível.</Text>
             )}
