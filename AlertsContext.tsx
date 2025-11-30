@@ -34,6 +34,7 @@ interface DeviceStatus {
   lastAlertType?: "PANICO" | "QUEDA";
   lastAlertAt?: number; // epoch ms
   deviceType?: string;
+  ip?: string;
 }
 
 type DeviceType = "pulseira" | "barreira" | "microondas" | "detector" | "gas_fumaca";
@@ -311,6 +312,7 @@ export const AlertsProvider: React.FC<AlertsProviderProps> = ({
                         status: "online",
                         lastSeen: Date.now(),
                         lastAlertAt: Date.now(),
+                        ip: data.ip || "desconhecido",
                     }
                 }));
                 // Persiste o alerta
@@ -343,6 +345,7 @@ export const AlertsProvider: React.FC<AlertsProviderProps> = ({
                         status: "online",
                         lastSeen: Date.now(),
                         lastAlertAt: Date.now(),
+                        ip: data.ip || "desconhecido",
                     }
                 }));
                 // Persiste o alerta
@@ -390,6 +393,7 @@ export const AlertsProvider: React.FC<AlertsProviderProps> = ({
                 rssiDbm: typeof data.rssiDbm === 'number' ? data.rssiDbm : prev[deviceId]?.rssiDbm,
                 tempCpuC: typeof data.tempCpuC === 'number' ? data.tempCpuC : prev[deviceId]?.tempCpuC,
                 heapB: typeof data.heapB === 'number' ? data.heapB : prev[deviceId]?.heapB,
+                ip: typeof data.ip === 'string' ? data.ip : prev[deviceId]?.ip,
               }
             }));
           }
@@ -428,6 +432,7 @@ export const AlertsProvider: React.FC<AlertsProviderProps> = ({
                   tempCpuC: statusData.temp_cpu_c,
                   heapB: statusData.free_heap_b,
                   rssiDbm: statusData.wifi_rssi_dbm,
+                  ip: typeof statusData.ip === 'string' ? statusData.ip : prev[deviceId]?.ip,
                 };
                 
                 return { ...prev, [deviceId]: updatedDevice };

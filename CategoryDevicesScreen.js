@@ -193,6 +193,11 @@ const renderDeviceCard = (device) => {
                         Atualizado há {Math.max(0, Math.floor((Date.now() - device.lastSeen)/1000))}s
                       </Text>
                     )}
+                    {typeof device.ip === 'string' && (
+                      <Text style={styles.deviceInfoText}>
+                        IP: {device.ip}
+                      </Text>
+                    )}
                   </View>
                 )}
               </>
