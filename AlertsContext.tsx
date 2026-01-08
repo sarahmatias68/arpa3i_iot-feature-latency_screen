@@ -89,8 +89,8 @@ interface AlertsContextType {
   alertsQueue: AlertItem[];
 }
 
-const WEBSOCKET_URL = "ws://192.168.2.115:86/ws";
-const SERVER_HTTP_BASE = "http://192.168.2.115:86";
+const WEBSOCKET_URL = "ws://192.168.2.131:86/ws";
+const SERVER_HTTP_BASE = "http://192.168.2.131:86";
 const DEVICE_TIMEOUT_MS = 11 * 60 * 1000; // 11 minutos
 export const SERVER_DEVICE_PATTERN = /servidor(_central)?|server/i;
 
