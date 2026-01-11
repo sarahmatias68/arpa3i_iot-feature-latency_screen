@@ -27,7 +27,7 @@ export default function MainScreen({ navigation, user, themeName = 'dark' }) {
   const theme = useMemo(() => getTheme(themeName), [themeName]);
   const styles = useMemo(() => createStyles(theme), [theme]);
 
-  // Detecta o dispositivo do servidor central por nome (servidor/server)
+  // Detecta o dispositivo do servidor central por nome (baseado no padrão definido no Context)
   const serverDevice = useMemo(() => {
     if (!devicesById) return null;
     const ids = Object.keys(devicesById);
@@ -35,7 +35,7 @@ export default function MainScreen({ navigation, user, themeName = 'dark' }) {
     return matchId ? devicesById[matchId] : null;
   }, [devicesById]);
 
-  // Modal de desconexão do servidor: aparece quando status muda para "Desconectado"
+  // Modal de desconexão do servidor
   const [showDisconnectModal, setShowDisconnectModal] = useState(false);
   const prevStatusRef = useRef(connectionStatus);
   useEffect(() => {
@@ -74,10 +74,6 @@ export default function MainScreen({ navigation, user, themeName = 'dark' }) {
     await updateDeviceType(deviceId, undefined);
   };
 
-  const getAlertCount = (devices) => {
-    return devices.filter(device => device.lastAlertType).length;
-  };
-
   const renderDeviceCard = (device) => {
     const deviceType = deviceTypes.find(t => t.id === device.deviceType);
     const typeConfig = deviceType || { name: "Sem tipo", color: "#6b7280" };
@@ -86,7 +82,7 @@ export default function MainScreen({ navigation, user, themeName = 'dark' }) {
     const statusText = device.connected ? 'Online' : 'Offline';
     const statusColor = device.connected ? '#22c55e' : '#6b7280';
     
-    // <<-- CORREÇÃO: Lógica unificada para qualquer tipo de alerta -->>
+    // Lógica unificada para alertas v46
     const isAlertActive = !!device.lastAlertType;
     const alertStyle = 
         device.lastAlertType === 'PANICO' ? styles.cardPanicActive :
@@ -99,7 +95,6 @@ export default function MainScreen({ navigation, user, themeName = 'dark' }) {
     const alertStatusColor = 
         device.lastAlertType === 'PANICO' ? '#ef4444' :
         device.lastAlertType === 'QUEDA' ? '#f59e0b' : statusColor;
-
 
     return (
       <TouchableOpacity 
@@ -158,8 +153,9 @@ export default function MainScreen({ navigation, user, themeName = 'dark' }) {
             {typeof device.rssiDbm === 'number' && (
               <Text style={styles.deviceInfoText}>WiFi: {device.rssiDbm} dBm</Text>
             )}
-            {typeof device.tempCpuC === 'number' && (
-              <Text style={styles.deviceInfoText}>CPU: {device.tempCpuC}°C</Text>
+            {/* Lógica de Temperatura Genérica para Dispositivos */}
+            {(typeof device.tempInternal === 'number' || typeof device.tempCpuC === 'number') && (
+              <Text style={styles.deviceInfoText}>CPU: {device.tempInternal ?? device.tempCpuC}°C</Text>
             )}
             {typeof device.heapB === 'number' && (
               <Text style={styles.deviceInfoText}>Heap: {device.heapB} B</Text>
@@ -200,7 +196,6 @@ export default function MainScreen({ navigation, user, themeName = 'dark' }) {
   };
 
   const renderCategoryButton = (title, iconName, devices, categoryKey, status, prependText) => {
-    // status: { text: string | null, bg: string | null }
     const bgColor = status?.bg || theme.colors.card ;
     const statusText = status?.text || null;
 
@@ -239,6 +234,9 @@ export default function MainScreen({ navigation, user, themeName = 'dark' }) {
     const statusText = connectionStatus;
     const statusColor = connectionStatus === 'Conectado' ? '#22c55e' : connectionStatus === 'Conectando...' ? '#facc15' : '#ef4444';
 
+    // Normalização da temperatura para v46 (tempInternal) ou legado (tempCpuC)
+    const serverTemp = serverDevice?.tempInternal ?? serverDevice?.tempCpuC;
+
     return (
       <TouchableOpacity
         style={styles.serverCard}
@@ -261,9 +259,14 @@ export default function MainScreen({ navigation, user, themeName = 'dark' }) {
             {typeof serverDevice?.heapB === 'number' && (
               <Text style={[styles.deviceInfoText, styles.serverMetricText]}>Heap: {serverDevice.heapB} B</Text>
             )}
-            {typeof serverDevice?.tempCpuC === 'number' && (
-              <Text style={[styles.deviceInfoText, styles.serverMetricText]}>CPU: {serverDevice.tempCpuC}°C</Text>
+            
+            {/* --- VISUALIZAÇÃO DE TEMPERATURA (ATUALIZADO v46) --- */}
+            {typeof serverTemp === 'number' && (
+              <Text style={[styles.deviceInfoText, styles.serverMetricText]}>
+                CPU: {serverTemp.toFixed(1)}°C
+              </Text>
             )}
+
             {typeof serverDevice?.rssiDbm === 'number' && (
               <Text style={[styles.deviceInfoText, styles.serverMetricText]}>WiFi: {serverDevice.rssiDbm} dBm</Text>
             )}
@@ -322,14 +325,12 @@ export default function MainScreen({ navigation, user, themeName = 'dark' }) {
           sensorDevices,
           'sensores',
           (() => {
-            // Verde e mensagem "Ambiente Seguro" quando NÃO há alerta ativo
             if (sensorState === 'Vazamento de Gás') {
               return { text: 'Gás Detectado', bg: '#7f1d1d' };
             }
             if (sensorState === 'Fumaça Detectada') {
               return { text: 'Fumaça Detectada', bg: '#7f1d1d' };
             }
-            // Qualquer outro estado: considerar seguro
             return { text: null, bg: null };
           })(),
           (sensorState === 'Vazamento de Gás' || sensorState === 'Fumaça Detectada') ? null : 'Ambiente Seguro'
@@ -356,7 +357,6 @@ export default function MainScreen({ navigation, user, themeName = 'dark' }) {
         )}
       </ScrollView>
 
-      {/* Modal de desconexão do servidor */}
       <Modal
         visible={showDisconnectModal}
         transparent
@@ -371,7 +371,6 @@ export default function MainScreen({ navigation, user, themeName = 'dark' }) {
               style={styles.alertButton}
               onPress={() => {
                 setShowDisconnectModal(false);
-                // Solicita broadcast como tentativa de recuperar status ao reconectar
                 try { requestSystemBroadcast?.(); } catch (e) {}
               }}
             >
