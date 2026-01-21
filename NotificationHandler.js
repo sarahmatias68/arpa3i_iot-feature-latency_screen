@@ -7,7 +7,7 @@ import { useAlerts } from './AlertsContext';
 export default function NotificationHandler({ isAuthenticated }) {
   const navigation = useNavigation();
   const { devicesById } = useAlerts();
-  const SERVER_HTTP_BASE = "http://192.168.2.131:86";
+  const SERVER_HTTP_BASE = "http://painel.arpa3i.me";
 
   useEffect(() => {
     if (!isAuthenticated) return;
