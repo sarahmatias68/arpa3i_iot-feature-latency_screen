@@ -81,7 +81,7 @@
 ### URLs do Servidor
 ```javascript
 const WEBSOCKET_URL = "ws://painel.arpa3i.me/ws";
-const API_URL = "http://painel.arpa3i.me";
+const API_URL = "https://painel.arpa3i.me";
 ```
 
 ### Tipos de Alertas Processados

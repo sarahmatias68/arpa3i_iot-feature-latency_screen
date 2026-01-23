@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { View, Text, TextInput, TouchableOpacity, StyleSheet, Alert, ActivityIndicator, KeyboardAvoidingView, TouchableWithoutFeedback, Keyboard, Platform } from 'react-native';
 
-const API_URL = 'http://painel.arpa3i.me'; 
+const API_URL = 'https://painel.arpa3i.me'; 
 
 const SignUpScreen = ({ navigation }) => {
   const [name, setName] = useState('');

@@ -47,7 +47,7 @@ export default function App() {
   // --- ADICIONADO ---
   // Ref para navegar ao clicar na notificação
   const navigationRef = useNavigationContainerRef();
-  const SERVER_HTTP_BASE = "http://painel.arpa3i.me";
+  const SERVER_HTTP_BASE = "https://painel.arpa3i.me";
 
   // --- USE EFFECT: auto-login (persistência de sessão) ---
   useEffect(() => {

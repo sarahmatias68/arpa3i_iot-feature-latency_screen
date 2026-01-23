@@ -33,8 +33,8 @@
       },
       "edgeToEdgeEnabled": true,
       "package": "com.sarah.santos.arpa3i_iot",
-      "googleServicesFile": "./google-services.json",
-      "usesCleartextTraffic": true
+      "googleServicesFile": "./google-services.json"
+      
     },
     "web": {
       "favicon": "./assets/favicon.png"

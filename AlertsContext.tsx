@@ -89,8 +89,8 @@ interface AlertsContextType {
   alertsQueue: AlertItem[];
 }
 
-const WEBSOCKET_URL = "ws://painel.arpa3i.me/ws";
-const SERVER_HTTP_BASE = "http://painel.arpa3i.me";
+const WEBSOCKET_URL = "wss://painel.arpa3i.me/ws";
+const SERVER_HTTP_BASE = "https://painel.arpa3i.me";
 const DEVICE_TIMEOUT_MS = 11 * 60 * 1000; // 11 minutos
 export const SERVER_DEVICE_PATTERN = /servidor(_central)?|server/i;
 
@@ -179,18 +179,6 @@ export const AlertsProvider: React.FC<AlertsProviderProps> = ({
               }
             })();
         }
-        // Inicializa o dispositivo virtual do sensor de gás e fumaça
-        setDevicesById(prev => ({
-          ...prev,
-          "SENSOR_GAS_FUMACA": {
-            deviceId: "SENSOR_GAS_FUMACA",
-            status: "online",
-            connected: true,
-            lastSeen: Date.now(),
-            deviceType: "gas_fumaca",
-          }
-
-        }));
 
         // Busca no servidor por alertas pendentes recentes (fallback quando o app estava fechado no momento do alerta)
         (async () => {
