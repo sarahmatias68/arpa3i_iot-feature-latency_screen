@@ -80,7 +80,7 @@
 
 ### URLs do Servidor
 ```javascript
-const WEBSOCKET_URL = "ws://painel.arpa3i.me/ws";
+const WEBSOCKET_URL = "ws://painel.arpa3i.me /ws";
 const API_URL = "https://painel.arpa3i.me";
 ```
 

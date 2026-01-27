@@ -2,7 +2,7 @@ import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 
-export default function AlertStatusCard({ activeAlert, onDismiss }) {
+export default function AlertStatusCard({ activeAlert}) {
   if (!activeAlert) return null;
 
   const getAlertIcon = (type) => {

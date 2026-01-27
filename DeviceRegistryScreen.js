@@ -38,11 +38,17 @@ const DeviceRegistryScreen = ({ navigation, themeName = 'dark' }) => {
       case 'barreira':
       case 'microondas':
       case 'detector':
-        return {
-          title: 'Detectores de Queda',
-          icon: 'body-outline',
-          key: 'detector',
-        };
+      return {
+        title: 'Detectores de Queda',
+        icon: 'body-outline',
+        key: 'detector',
+      };
+    case 'automacao':
+      return {
+        title: 'Automação',
+        icon: 'build-outline',
+        key: 'automacao',
+      };
       default:
         // Fallback para tipos "não definidos" ou desconhecidos
         return {

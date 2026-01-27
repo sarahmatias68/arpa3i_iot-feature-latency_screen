@@ -37,7 +37,7 @@ interface DeviceStatus {
   ip?: string;
 }
 
-type DeviceType = "pulseira" | "barreira" | "microondas" | "detector" | "gas_fumaca";
+type DeviceType = "pulseira" | "barreira" | "microondas" | "detector" | "gas_fumaca" | "automacao";
 
 interface DeviceTypeConfig {
   id: DeviceType;
@@ -85,11 +85,12 @@ interface AlertsContextType {
   requestSystemBroadcast: () => void;
   addDevice: (deviceId: string) => Promise<void>;
   removeDevice: (deviceId: string) => Promise<void>;
+  enviarComando: (targetId: string, action: string) => void;
   // fila
   alertsQueue: AlertItem[];
 }
 
-const WEBSOCKET_URL = "wss://painel.arpa3i.me/ws";
+const WEBSOCKET_URL = "wss://app.arpa3i.me/ws";
 const SERVER_HTTP_BASE = "https://painel.arpa3i.me";
 const DEVICE_TIMEOUT_MS = 11 * 60 * 1000; // 11 minutos
 export const SERVER_DEVICE_PATTERN = /servidor(_central)?|server/i;
@@ -128,6 +129,7 @@ export const AlertsProvider: React.FC<AlertsProviderProps> = ({
     { id: "detector", name: "Detector de Queda", color: "#ef4444", icon: "body-outline" },
     { id: "microondas", name: "Micro-ondas", color: "#f59e0b", icon: "radio-outline" },
     { id: "gas_fumaca", name: "Gás e Fumaça", color: "#6b7280", icon: "flame-outline" },
+    { id: "automacao", name: "Automação", color: "#8b5cf6", icon: "build-outline" },
   ];
 
   const markAllDevicesAsOffline = useCallback(() => {
@@ -801,6 +803,22 @@ export const AlertsProvider: React.FC<AlertsProviderProps> = ({
     });
   };
 
+  const enviarComando = (targetId: string, action: string) => {
+    if (ws.current?.ws && connectionStatus === "Conectado") {
+      const payload = {
+        type: "COMANDO",
+        target: targetId,
+        payload: {
+          action: action
+        }
+      };
+      console.log("Enviando comando:", payload);
+      ws.current.ws.send(JSON.stringify(payload));
+    } else {
+      console.log("Erro: Socket desconectado. Não foi possível enviar.");
+    }
+  };
+
   const value: AlertsContextType = {
     connectionStatus,
     sensorState,
@@ -817,6 +835,7 @@ export const AlertsProvider: React.FC<AlertsProviderProps> = ({
     requestSystemBroadcast,
     addDevice,
     removeDevice,
+    enviarComando,
     alertsQueue,
   };
 

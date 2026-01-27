@@ -1,4 +1,4 @@
-import { View, Text, StyleSheet, StatusBar, TouchableOpacity, ScrollView, Modal } from 'react-native';
+import { View, Text, StyleSheet, StatusBar, TouchableOpacity, ScrollView, Modal, Button, RefreshControl } from 'react-native';
 import { useMemo, useState, useEffect, useRef } from 'react';
 import { Ionicons } from '@expo/vector-icons';
 import { useAlerts, SERVER_DEVICE_PATTERN } from './AlertsContext';
@@ -19,13 +19,21 @@ export default function MainScreen({ navigation, user, themeName = 'dark' }) {
     dismissActiveAlert,
     devicesById,
     requestSystemBroadcast,
+    enviarComando,
   } = useAlerts();
 
   const [typeSelectorVisible, setTypeSelectorVisible] = useState(false);
   const [selectedDeviceId, setSelectedDeviceId] = useState(null);
   const [serverExpanded, setServerExpanded] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
   const theme = useMemo(() => getTheme(themeName), [themeName]);
   const styles = useMemo(() => createStyles(theme), [theme]);
+
+  const onRefresh = async () => {
+    setRefreshing(true);
+    await requestSystemBroadcast();
+    setTimeout(() => setRefreshing(false), 500);
+  };
 
   // Detecta o dispositivo do servidor central por nome (servidor/server)
   const serverDevice = useMemo(() => {
@@ -68,6 +76,7 @@ export default function MainScreen({ navigation, user, themeName = 'dark' }) {
   const pulseiraDevices = getDevicesByType('pulseira');
   const detectorDevices = [...getDevicesByType('barreira'), ...getDevicesByType('microondas'), ...getDevicesByType('detector')];
   const sensorDevices = getDevicesByType('gas_fumaca').filter(d => d.deviceId !== 'SENSOR_GAS_FUMACA');
+  const automacaoDevices = getDevicesByType('automacao');
   const newDevices = getNewDevices();
 
   const handleRemoveType = async (deviceId) => {
@@ -296,7 +305,25 @@ export default function MainScreen({ navigation, user, themeName = 'dark' }) {
         style={styles.scrollView}
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={theme.colors.primary} />}
       >
+        {/* === ÁREA DE TESTE RÁPIDO === */}
+        <View style={{ margin: 20, padding: 10, backgroundColor: '#ddd', borderRadius: 10 }}>
+            <Text style={{ textAlign: 'center', marginBottom: 10, fontWeight: 'bold' }}>
+                Área de Teste de Automação
+            </Text>
+            
+            <Button 
+                title="⚡ ABRIR PORTÃO (TESTE)" 
+                color="#6200ea"
+                onPress={() => {
+                    // SUBSTITUA PELO ID REAL DO SEU ESP32 DE PORTÃO
+                    const ID_DO_PORTAO = "Modulo_Portao_1"; 
+                    enviarComando(ID_DO_PORTAO, "PORTAO_ABRIR");
+                }} 
+            />
+        </View>
+        {/* ============================ */}
         {renderServerCard()}
         {newDevices.length > 0 && (
           <View style={styles.newDevicesSection}>
@@ -354,6 +381,16 @@ export default function MainScreen({ navigation, user, themeName = 'dark' }) {
             return hasFall ? { text: 'Queda Detectada', bg: '#7f1d1d' } : { text: null, bg: null };
           })()
         )}
+        {renderCategoryButton(
+          'Automação',
+          'build-outline',
+          automacaoDevices,
+          'automacao',
+          (() => {
+            return { text: null, bg: null };
+          })()
+        )}
+        <Button title="Testar Abrir Portão" onPress={() => enviarComando('portao', 'ABRIR')} />
       </ScrollView>
 
       {/* Modal de desconexão do servidor */}
