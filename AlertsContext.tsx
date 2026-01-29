@@ -35,6 +35,7 @@ interface DeviceStatus {
   lastAlertAt?: number; // epoch ms
   deviceType?: string;
   ip?: string;
+  gateState?: string;
 }
 
 type DeviceType = "pulseira" | "barreira" | "microondas" | "detector" | "gas_fumaca" | "automacao";
@@ -362,6 +363,22 @@ export const AlertsProvider: React.FC<AlertsProviderProps> = ({
                   }
                 ]));
              }
+          }
+          else if (data.type === "ESTADO") {
+            const newState = data.payload?.estado;
+            if (newState) {
+              setDevicesById(prev => ({
+                ...prev,
+                [deviceId]: {
+                  ...(prev[deviceId] || { deviceId }),
+                  gateState: newState,
+                  // Garante que o dispositivo seja marcado como online ao receber um estado
+                  status: "online",
+                  connected: true,
+                  lastSeen: Date.now(),
+                }
+              }));
+            }
           }
           else if (data.type === "sensor") {
             setSensorState(data.tipo);

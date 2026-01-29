@@ -1,4 +1,4 @@
-import { View, Text, StyleSheet, StatusBar, TouchableOpacity, ScrollView, Modal, Button, RefreshControl } from 'react-native';
+import { View, Text, StyleSheet, StatusBar, TouchableOpacity, ScrollView, Modal, Alert } from 'react-native';
 import { useMemo, useState, useEffect, useRef } from 'react';
 import { Ionicons } from '@expo/vector-icons';
 import { useAlerts, SERVER_DEVICE_PATTERN } from './AlertsContext';
@@ -19,21 +19,14 @@ export default function MainScreen({ navigation, user, themeName = 'dark' }) {
     dismissActiveAlert,
     devicesById,
     requestSystemBroadcast,
-    enviarComando,
+    enviarComando, // <--- ADICIONADO: Importando função de comando
   } = useAlerts();
 
   const [typeSelectorVisible, setTypeSelectorVisible] = useState(false);
   const [selectedDeviceId, setSelectedDeviceId] = useState(null);
   const [serverExpanded, setServerExpanded] = useState(false);
-  const [refreshing, setRefreshing] = useState(false);
   const theme = useMemo(() => getTheme(themeName), [themeName]);
   const styles = useMemo(() => createStyles(theme), [theme]);
-
-  const onRefresh = async () => {
-    setRefreshing(true);
-    await requestSystemBroadcast();
-    setTimeout(() => setRefreshing(false), 500);
-  };
 
   // Detecta o dispositivo do servidor central por nome (servidor/server)
   const serverDevice = useMemo(() => {
@@ -43,8 +36,11 @@ export default function MainScreen({ navigation, user, themeName = 'dark' }) {
     return matchId ? devicesById[matchId] : null;
   }, [devicesById]);
 
-  // Modal de desconexão do servidor: aparece quando status muda para "Desconectado"
+  // Modal de desconexão do servidor
   const [showDisconnectModal, setShowDisconnectModal] = useState(false);
+
+
+
   const prevStatusRef = useRef(connectionStatus);
   useEffect(() => {
     if (prevStatusRef.current !== connectionStatus) {
@@ -52,10 +48,105 @@ export default function MainScreen({ navigation, user, themeName = 'dark' }) {
         setShowDisconnectModal(true);
       } else if (connectionStatus === 'Conectado') {
         setShowDisconnectModal(false);
+        
+        // --- INÍCIO DO PROTOCOLO UNIVERSAL DE AUTOMAÇÃO ---
+        console.log('Conexão estabelecida. Iniciando Handshake de Automação...');
+        
+        // 1. Solicita telemetria geral de todos os dispositivos
+        requestSystemBroadcast();
+
+        // 2. Itera sobre todos os dispositivos conhecidos para solicitar status de automação
+        if (devicesById) {
+          Object.values(devicesById).forEach(device => {
+            // Verifica se é um dispositivo de automação ou um portão
+            if (device.deviceType === 'automacao' || device.deviceId.startsWith('Portao')) {
+              console.log(`Enviando GET_STATUS para o dispositivo de automação: ${device.deviceId}`);
+              enviarComando(device.deviceId, 'GET_STATUS');
+            }
+          });
+        }
+        // --- FIM DO PROTOCOLO ---
+
       }
       prevStatusRef.current = connectionStatus;
     }
-  }, [connectionStatus]);
+  }, [connectionStatus, devicesById, requestSystemBroadcast, enviarComando]); 
+
+
+  // --- LÓGICA DO PORTÃO ---
+  const TARGET_GATE_ID = 'Portao_6C0878'; // ID fixo do dispositivo do portão
+  const gateDevice = devicesById[TARGET_GATE_ID];
+  const gateState = gateDevice?.gateState;
+
+
+  const handleGateAction = () => {
+    const isOpening = (gateState === 'FECHADO');
+    const alertText = isOpening ? 'abrir' : 'fechar';
+    const alertTitle = isOpening ? 'ABRIR' : 'FECHAR';
+
+    Alert.alert(
+      `Confirmar Ação`,
+      `Deseja realmente ${alertText} o portão?`,
+      [
+        { text: "Cancelar", style: "cancel" },
+        { 
+          text: alertTitle,
+          onPress: () => {
+            // O comando é sempre ABRIR, pois o motor funciona com pulso
+            enviarComando(TARGET_GATE_ID, 'PORTAO_ABRIR');
+          }
+        }
+      ]
+    );
+  };
+
+  const renderGateButton = () => {
+    let buttonStyle = styles.gateButton;
+    let text = "Acionar portão";
+    let icon = "key-outline";
+
+    switch (gateState) {
+      case 'FECHADO':
+        text = "Portão Fechado";
+        buttonStyle = [styles.gateButton, { backgroundColor: '#22c55e' }]; // Verde
+        icon = "lock-closed-outline";
+        break;
+      case 'ABERTO':
+        buttonStyle = [styles.gateButton, { backgroundColor: '#ef4444' }]; // Vermelho
+        text = "Portão Aberto";
+        icon = "lock-open-outline";
+        break;
+      case 'EM_MOVIMENTO':
+        buttonStyle = [styles.gateButton, { backgroundColor: '#f59e0b' }]; // Amarelo
+        text = "Movendo...";
+        icon = "swap-horizontal-outline";
+        break;
+      case 'ACIONADO':
+        buttonStyle = [styles.gateButton, { backgroundColor: '#6b7280' }]; // Cinza
+        text = "Acionado";
+        icon = "hourglass-outline";
+        break;
+      default: // undefined, null, ou outro estado -> Sincronizando
+        buttonStyle = [styles.gateButton, { backgroundColor: '#6b7280' }]; // Cinza por padrão
+        text = "Sincronizando...";
+        icon = "cloud-download-outline";
+        break;
+    }
+
+    return (
+      <View style={styles.categoryContainer}>
+        <TouchableOpacity 
+          style={[styles.categoryButton, buttonStyle]} 
+          onPress={handleGateAction}
+          activeOpacity={0.8}
+        >
+          <Text style={styles.gateStateText}>Estado do Portão</Text>
+          <Ionicons name={icon} size={48} color="#ffffff" style={styles.categoryIcon} />
+          <Text style={styles.gateButtonText}>{text}</Text>
+        </TouchableOpacity>
+      </View>
+    );
+  };
 
   const getColorForSensorState = (state) => {
     switch (state) {
@@ -83,10 +174,6 @@ export default function MainScreen({ navigation, user, themeName = 'dark' }) {
     await updateDeviceType(deviceId, undefined);
   };
 
-  const getAlertCount = (devices) => {
-    return devices.filter(device => device.lastAlertType).length;
-  };
-
   const renderDeviceCard = (device) => {
     const deviceType = deviceTypes.find(t => t.id === device.deviceType);
     const typeConfig = deviceType || { name: "Sem tipo", color: "#6b7280" };
@@ -95,7 +182,6 @@ export default function MainScreen({ navigation, user, themeName = 'dark' }) {
     const statusText = device.connected ? 'Online' : 'Offline';
     const statusColor = device.connected ? '#22c55e' : '#6b7280';
     
-    // <<-- CORREÇÃO: Lógica unificada para qualquer tipo de alerta -->>
     const isAlertActive = !!device.lastAlertType;
     const alertStyle = 
         device.lastAlertType === 'PANICO' ? styles.cardPanicActive :
@@ -108,7 +194,6 @@ export default function MainScreen({ navigation, user, themeName = 'dark' }) {
     const alertStatusColor = 
         device.lastAlertType === 'PANICO' ? '#ef4444' :
         device.lastAlertType === 'QUEDA' ? '#f59e0b' : statusColor;
-
 
     return (
       <TouchableOpacity 
@@ -139,7 +224,7 @@ export default function MainScreen({ navigation, user, themeName = 'dark' }) {
                 disabled={isAlertActive}
                 hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
               >
-                <Text style={styles.removeButtonText}>Remover Tipo</Text>
+                <Text style={styles.removeButtonText}>Remover</Text>
               </TouchableOpacity>
             )}
           </View>
@@ -209,7 +294,6 @@ export default function MainScreen({ navigation, user, themeName = 'dark' }) {
   };
 
   const renderCategoryButton = (title, iconName, devices, categoryKey, status, prependText) => {
-    // status: { text: string | null, bg: string | null }
     const bgColor = status?.bg || theme.colors.card ;
     const statusText = status?.text || null;
 
@@ -305,26 +389,12 @@ export default function MainScreen({ navigation, user, themeName = 'dark' }) {
         style={styles.scrollView}
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={theme.colors.primary} />}
       >
-        {/* === ÁREA DE TESTE RÁPIDO === */}
-        <View style={{ margin: 20, padding: 10, backgroundColor: '#ddd', borderRadius: 10 }}>
-            <Text style={{ textAlign: 'center', marginBottom: 10, fontWeight: 'bold' }}>
-                Área de Teste de Automação
-            </Text>
-            
-            <Button 
-                title="⚡ ABRIR PORTÃO (TESTE)" 
-                color="#6200ea"
-                onPress={() => {
-                    // SUBSTITUA PELO ID REAL DO SEU ESP32 DE PORTÃO
-                    const ID_DO_PORTAO = "Modulo_Portao_1"; 
-                    enviarComando(ID_DO_PORTAO, "PORTAO_ABRIR");
-                }} 
-            />
-        </View>
-        {/* ============================ */}
         {renderServerCard()}
+
+        {renderGateButton()}
+
+
         {newDevices.length > 0 && (
           <View style={styles.newDevicesSection}>
             <View style={styles.newDevicesHeaderRow}>
@@ -349,14 +419,12 @@ export default function MainScreen({ navigation, user, themeName = 'dark' }) {
           sensorDevices,
           'sensores',
           (() => {
-            // Verde e mensagem "Ambiente Seguro" quando NÃO há alerta ativo
             if (sensorState === 'Vazamento de Gás') {
               return { text: 'Gás Detectado', bg: '#7f1d1d' };
             }
             if (sensorState === 'Fumaça Detectada') {
               return { text: 'Fumaça Detectada', bg: '#7f1d1d' };
             }
-            // Qualquer outro estado: considerar seguro
             return { text: null, bg: null };
           })(),
           (sensorState === 'Vazamento de Gás' || sensorState === 'Fumaça Detectada') ? null : 'Ambiente Seguro'
@@ -390,7 +458,6 @@ export default function MainScreen({ navigation, user, themeName = 'dark' }) {
             return { text: null, bg: null };
           })()
         )}
-        <Button title="Testar Abrir Portão" onPress={() => enviarComando('portao', 'ABRIR')} />
       </ScrollView>
 
       {/* Modal de desconexão do servidor */}
@@ -408,7 +475,6 @@ export default function MainScreen({ navigation, user, themeName = 'dark' }) {
               style={styles.alertButton}
               onPress={() => {
                 setShowDisconnectModal(false);
-                // Solicita broadcast como tentativa de recuperar status ao reconectar
                 try { requestSystemBroadcast?.(); } catch (e) {}
               }}
             >
@@ -444,6 +510,38 @@ const createStyles = (theme) => StyleSheet.create({
     flexGrow: 1,
     justifyContent: 'center',
   },
+  // --- ESTILOS DO BOTÃO DE PORTÃO REORGANIZADOS ---
+  gateButton: {
+    width: '100%', 
+    paddingVertical: 20, // Padding vertical confortável
+    alignItems: 'center',
+    justifyContent: 'center',
+    // Removed elevation/shadow duplicates since categoryButton handles it
+  },
+  gateContent: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8, // Espaçamento uniforme entre os elementos (Texto Topo, Ícone, Texto Botão)
+  },
+  gateButtonText: {
+    color: '#ffffff',
+    fontSize: 20,
+    fontWeight: 'bold',
+    letterSpacing: 1,
+    textAlign: 'center',
+  },
+  gateStateText: {
+    color: 'rgba(255, 255, 255, 0.9)',
+    fontSize: 13,
+    fontWeight: '600',
+    letterSpacing: 0.5,
+    textAlign: 'center',
+    // Removido position: absolute para fluir na lista
+  },
+  gateIcon: {
+    marginBottom: 0, // Reset de margens se houver global
+  },
+  // ----------------------------------
   newDevicesSection: {
     backgroundColor: theme.colors.card,
     borderRadius: 12,

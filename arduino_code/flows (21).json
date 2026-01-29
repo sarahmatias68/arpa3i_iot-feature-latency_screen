@@ -1,0 +1,1436 @@
+[
+    {
+        "id": "tab_app_v9_toolbar",
+        "type": "tab",
+        "label": "Sistema Arpa3i (V9 - Barra Ativa)",
+        "disabled": false,
+        "info": ""
+    },
+    {
+        "id": "group_proxy_granular",
+        "type": "group",
+        "z": "tab_app_v9_toolbar",
+        "name": "Proxy Granular (Rotas Exatas)",
+        "style": {
+            "stroke": "#000000",
+            "fill": "#fff9c4",
+            "label": true
+        },
+        "nodes": [
+            "http_in_dev_root",
+            "http_in_dev_sub",
+            "http_in_alerts_root",
+            "http_in_users_root",
+            "http_in_users_sub",
+            "http_in_login",
+            "http_in_ack",
+            "http_in_elderly_root",
+            "http_in_elderly_sub",
+            "func_proxy_granular",
+            "http_req_granular",
+            "http_res_granular"
+        ],
+        "x": 44,
+        "y": 639,
+        "w": 1002,
+        "h": 402
+    },
+    {
+        "id": "ui_base_v9_docker",
+        "type": "ui_base",
+        "theme": {
+            "name": "theme-light",
+            "lightTheme": {
+                "default": "#0094CE",
+                "baseColor": "#0094CE",
+                "baseFont": "-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,Oxygen-Sans,Ubuntu,Cantarell,Helvetica Neue,sans-serif",
+                "edited": true,
+                "reset": false
+            },
+            "darkTheme": {
+                "default": "#097479",
+                "baseColor": "#097479",
+                "baseFont": "-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,Oxygen-Sans,Ubuntu,Cantarell,Helvetica Neue,sans-serif",
+                "edited": false
+            },
+            "customTheme": {
+                "name": "Untitled Theme 1",
+                "default": "#4B7930",
+                "baseColor": "#4B7930",
+                "baseFont": "-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,Oxygen-Sans,Ubuntu,Cantarell,Helvetica Neue,sans-serif"
+            },
+            "themeState": {
+                "base-color": {
+                    "default": "#0094CE",
+                    "value": "#0094CE",
+                    "edited": false
+                },
+                "page-titlebar-backgroundColor": {
+                    "value": "#0094CE",
+                    "edited": false
+                },
+                "page-backgroundColor": {
+                    "value": "#fafafa",
+                    "edited": false
+                },
+                "page-sidebar-backgroundColor": {
+                    "value": "#ffffff",
+                    "edited": false
+                },
+                "group-textColor": {
+                    "value": "#1bbfff",
+                    "edited": false
+                },
+                "group-borderColor": {
+                    "value": "#ffffff",
+                    "edited": false
+                },
+                "group-backgroundColor": {
+                    "value": "#ffffff",
+                    "edited": false
+                },
+                "widget-textColor": {
+                    "value": "#111111",
+                    "edited": false
+                },
+                "widget-backgroundColor": {
+                    "value": "#0094ce",
+                    "edited": false
+                },
+                "widget-borderColor": {
+                    "value": "#ffffff",
+                    "edited": false
+                },
+                "base-font": {
+                    "value": "-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,Oxygen-Sans,Ubuntu,Cantarell,Helvetica Neue,sans-serif"
+                }
+            },
+            "angularTheme": {
+                "primary": "indigo",
+                "accents": "blue",
+                "warn": "red",
+                "background": "grey",
+                "palette": "light"
+            }
+        },
+        "site": {
+            "name": "Arpa3i",
+            "hideToolbar": "false",
+            "allowSwipe": "false",
+            "lockMenu": "false",
+            "allowTempTheme": "true",
+            "dateFormat": "DD/MM/YYYY",
+            "sizes": {
+                "sx": 48,
+                "sy": 48,
+                "gx": 6,
+                "gy": 6,
+                "cx": 6,
+                "cy": 6,
+                "px": 0,
+                "py": 0
+            }
+        }
+    },
+    {
+        "id": "ws_client_esp32_v9",
+        "type": "websocket-client",
+        "path": "ws://192.168.2.131:86/ws",
+        "tls": "",
+        "wholemsg": "false",
+        "hb": "0",
+        "subprotocol": "",
+        "headers": []
+    },
+    {
+        "id": "firebase_admin_v9",
+        "type": "firebase admin",
+        "name": "Arpa3i Firebase"
+    },
+    {
+        "id": "tab_home",
+        "type": "ui_tab",
+        "name": " ",
+        "icon": "",
+        "order": 1,
+        "disabled": false,
+        "hidden": false
+    },
+    {
+        "id": "tab_login",
+        "type": "ui_tab",
+        "name": " ",
+        "icon": "",
+        "order": 2,
+        "disabled": false,
+        "hidden": false
+    },
+    {
+        "id": "tab_config_hidden",
+        "type": "ui_tab",
+        "name": " ",
+        "icon": "",
+        "order": 3,
+        "disabled": false,
+        "hidden": true
+    },
+    {
+        "id": "group_home_main",
+        "type": "ui_group",
+        "z": "tab_app_v9_toolbar",
+        "name": "Controle de Acesso",
+        "tab": "tab_home",
+        "order": 1,
+        "disp": false,
+        "width": "6",
+        "collapse": false
+    },
+    {
+        "id": "group_login",
+        "type": "ui_group",
+        "z": "tab_app_v9_toolbar",
+        "name": "Autenticação Necessária",
+        "tab": "tab_login",
+        "order": 1,
+        "disp": true,
+        "width": "6",
+        "collapse": false,
+        "className": ""
+    },
+    {
+        "id": "group_config_area",
+        "type": "ui_group",
+        "z": "tab_app_v9_toolbar",
+        "name": "⚙️ Configuração do Sistema",
+        "tab": "tab_config_hidden",
+        "order": 1,
+        "disp": true,
+        "width": "6",
+        "collapse": false
+    },
+    {
+        "id": "init_system",
+        "type": "inject",
+        "z": "tab_app_v9_toolbar",
+        "name": "Ao Iniciar",
+        "props": [
+            {
+                "p": "payload"
+            },
+            {
+                "p": "topic",
+                "vt": "str"
+            }
+        ],
+        "repeat": "",
+        "crontab": "",
+        "once": true,
+        "onceDelay": 0.1,
+        "topic": "",
+        "payload": "",
+        "payloadType": "date",
+        "x": 140,
+        "y": 200,
+        "wires": [
+            [
+                "read_config_file",
+                "load_cached_status"
+            ]
+        ]
+    },
+    {
+        "id": "read_config_file",
+        "type": "file in",
+        "z": "tab_app_v9_toolbar",
+        "name": "Lê Config",
+        "filename": "/data/config_id_portao.txt",
+        "format": "utf8",
+        "chunk": false,
+        "sendError": false,
+        "encoding": "none",
+        "allProps": false,
+        "x": 300,
+        "y": 200,
+        "wires": [
+            [
+                "set_global_id",
+                "link_out_id_broadcast"
+            ]
+        ]
+    },
+    {
+        "id": "set_global_id",
+        "type": "change",
+        "z": "tab_app_v9_toolbar",
+        "name": "Define Global",
+        "rules": [
+            {
+                "t": "set",
+                "p": "id_portao",
+                "pt": "global",
+                "to": "payload",
+                "tot": "msg"
+            }
+        ],
+        "action": "",
+        "property": "",
+        "from": "",
+        "to": "",
+        "reg": false,
+        "x": 480,
+        "y": 200,
+        "wires": [
+            []
+        ]
+    },
+    {
+        "id": "load_cached_status",
+        "type": "change",
+        "z": "tab_app_v9_toolbar",
+        "name": "Recupera Status",
+        "rules": [
+            {
+                "t": "set",
+                "p": "payload",
+                "pt": "msg",
+                "to": "cache_status_texto",
+                "tot": "global"
+            },
+            {
+                "t": "set",
+                "p": "color",
+                "pt": "msg",
+                "to": "cache_status_cor",
+                "tot": "global"
+            },
+            {
+                "t": "set",
+                "p": "bgcolor",
+                "pt": "msg",
+                "to": "cache_status_bgcolor",
+                "tot": "global"
+            },
+            {
+                "t": "set",
+                "p": "icon",
+                "pt": "msg",
+                "to": "cache_status_icon",
+                "tot": "global"
+            }
+        ],
+        "action": "",
+        "property": "",
+        "from": "",
+        "to": "",
+        "reg": false,
+        "x": 170,
+        "y": 300,
+        "wires": [
+            [
+                "940b686d1fa8ad98"
+            ]
+        ]
+    },
+    {
+        "id": "save_cached_status",
+        "type": "change",
+        "z": "tab_app_v9_toolbar",
+        "name": "Salva Memória",
+        "rules": [
+            {
+                "t": "set",
+                "p": "cache_status_texto",
+                "pt": "global",
+                "to": "payload",
+                "tot": "msg"
+            },
+            {
+                "t": "set",
+                "p": "cache_status_cor",
+                "pt": "global",
+                "to": "color",
+                "tot": "msg"
+            },
+            {
+                "t": "set",
+                "p": "cache_status_bgcolor",
+                "pt": "global",
+                "to": "bgcolor",
+                "tot": "msg"
+            },
+            {
+                "t": "set",
+                "p": "cache_status_icon",
+                "pt": "global",
+                "to": "icon",
+                "tot": "msg"
+            }
+        ],
+        "action": "",
+        "property": "",
+        "from": "",
+        "to": "",
+        "reg": false,
+        "x": 960,
+        "y": 460,
+        "wires": [
+            []
+        ]
+    },
+    {
+        "id": "http_in_alert",
+        "type": "http in",
+        "z": "tab_app_v9_toolbar",
+        "name": "",
+        "url": "/alerta",
+        "method": "post",
+        "upload": false,
+        "skipBodyParsing": false,
+        "swaggerDoc": "",
+        "x": 130,
+        "y": 60,
+        "wires": [
+            [
+                "http_response_ok",
+                "backup_alert_data"
+            ]
+        ]
+    },
+    {
+        "id": "http_response_ok",
+        "type": "http response",
+        "z": "tab_app_v9_toolbar",
+        "name": "",
+        "statusCode": "200",
+        "headers": {},
+        "x": 280,
+        "y": 100,
+        "wires": []
+    },
+    {
+        "id": "backup_alert_data",
+        "type": "change",
+        "z": "tab_app_v9_toolbar",
+        "name": "Prepara Dados",
+        "rules": [
+            {
+                "t": "set",
+                "p": "dadosAlerta",
+                "pt": "msg",
+                "to": "payload",
+                "tot": "msg"
+            }
+        ],
+        "action": "",
+        "property": "",
+        "from": "",
+        "to": "",
+        "reg": false,
+        "x": 300,
+        "y": 60,
+        "wires": [
+            [
+                "firestore_get_tokens"
+            ]
+        ]
+    },
+    {
+        "id": "firestore_get_tokens",
+        "type": "Firestore in",
+        "z": "tab_app_v9_toolbar",
+        "name": "Ler Tokens",
+        "collection": "deviceTokens",
+        "group": false,
+        "document": "",
+        "realtime": false,
+        "query": [],
+        "admin": "firebase_admin_v9",
+        "snapHandler": "",
+        "eject": false,
+        "x": 490,
+        "y": 60,
+        "wires": [
+            [
+                "format_notification"
+            ]
+        ]
+    },
+    {
+        "id": "format_notification",
+        "type": "function",
+        "z": "tab_app_v9_toolbar",
+        "name": "Formatar Notificação",
+        "func": "var tokensMap = msg.payload; \nvar listaTokens = Object.keys(tokensMap);\nvar dadosOriginais = msg.dadosAlerta || {};\nvar tituloAlerta = dadosOriginais.type ? \"⚠️ \" + dadosOriginais.type : \"⚠️ ALERTA ARPA3i\";\nvar corpoAlerta = dadosOriginais.message || \"Evento detectado no sistema.\";\nvar mensagensParaEnviar = [];\n\nlistaTokens.forEach(function(token) {\n    if (token && token.length > 20) { \n        var msgIndividual = {\n            payload: {\n                token: token,\n                notification: {\n                    title: tituloAlerta,\n                    body: corpoAlerta\n                },\n                data: {\n                    type: dadosOriginais.type || \"ALERTA\",\n                    local: \"Residencia\"\n                },\n                android: {\n                    priority: \"high\",\n                    notification: {\n                        sound: \"default\",\n                        channelId: \"high_importance_channel\"\n                    }\n                }\n            }\n        };\n        mensagensParaEnviar.push(msgIndividual);\n    }\n});\nreturn [mensagensParaEnviar];",
+        "outputs": 1,
+        "timeout": 0,
+        "noerr": 0,
+        "initialize": "",
+        "finalize": "",
+        "libs": [],
+        "x": 680,
+        "y": 60,
+        "wires": [
+            [
+                "firebase_send"
+            ]
+        ]
+    },
+    {
+        "id": "firebase_send",
+        "type": "firebase-messaging",
+        "z": "tab_app_v9_toolbar",
+        "name": "Enviar Push",
+        "serviceAccount": "{   \"type\": \"service_account\",   \"project_id\": \"arpa3iv1\",   \"private_key_id\": \"9fd7bad7f420f2bd0c1bb6ed89ff0c4e2db689ea\",   \"private_key\": \"-----BEGIN PRIVATE KEY-----\\nMIIEvAIBADANBgkqhkiG9w0BAQEFAASCBKYwggSiAgEAAoIBAQCvTHUNVrB1v3Vb\\nBjIYKwGUyqbjUurfw0+XlNOME4oaa5orLiA4D9Wl/rKNdNoeuC7lmIQqLSqisYDn\\ndxFWwX4JZidsgCG359iHrDrptKNNXaQFCJywQcvz1fzVrfNjYGNFshrC82xvXJ32\\nLchYFWJBzv2myMJ3lBCNQgzQqxH7g4wHVRG/GN/8ByNJyADaQBKAyqOB/I1/5Q4y\\n4HN7BTcpZwiAHuyIy/Tz4uK+z3vqOGqFCHCU2+EnWGIaOgzb85XnKUdYXv+LIk4E\\nU9n3Ag1pNAjdYf4Ax4osfwyHFu9pqFZCmDS1CXSq0BXxk2ZXhTy9osHMDpn2dzMi\\n4b4STMUjAgMBAAECggEAIGkddzLg+1RDyWmS138UEsOJKZyKCocc7yS4HDz8mrfs\\nUDF+CX97++3ka10Aew+ItDCHtxiUunHhKGqOTSEHQYuenGPwWAVItoT0e4NHciVv\\nDvMxrTDtGY8l6Qf5aRVIJXmxkvvYv5o7Jmn+kbKacRppMW4K7nr0uHlOz0Hh2EOC\\nhwGO9Gv6Q5VVa4mqt4OBMawLudEoeSQt7vq27qZAf26+dpxy+aGuqKFMx0rKXvWY\\nRDdUuTZc8u+OuLV9mLadg1Ijgguneu+r92CGRJFH8EOn81UWUbjZzw0nR8B9y2nf\\ng45Q9lCJFdGb7A6in+MPuuEkrT9v4EHgjva3ApelQQKBgQDl09DGwWs/N32tsmBf\\nBQ3Zj8pOFHZ0kmagfzctYppF0OiFXjA1QazunMPXAhobxNjWY9eaA5K9M+G9puJr\\nKz+8IVt2zVXAKXkVxriHqsZ/vqd+ULvIk+80e1g6zMn8HWePI1v3d8lKu5yS7wjj\\ngqscaH/9M91LEM8TJuoK1F68IQKBgQDDQvWD4yTK9+KIOnwkNK/k3zpnhAbiLjFw\\nXEk1q/ebAUEY5ZLSG5sps21w1xA68i66OesTstWHONsnAwvHKnR2wAsmohUm/PGa\\noTDOD0+XsK86TtnZ7Tt5YM4eoh1WxHQZAKWBfQYItvd5K/BaAJ0IvAy901Nc482A\\nywfnx3R4wwKBgEEeT/RQz1tdFK4HcYjavL7dH/wZjiqfZJarFO42FvIbLBbFxjEA\\nx8fgARlFjjI6BxpPtcH8qzISpi5/P34QBgH/DZROv7IvzhAeeyBtgcqmMXz30Q0W\\n5Vrga/JVHhHiHvqOkTs/5HfZSpbTRZh46JSnA0Sx0ky3mYSarQueeq0hAoGAM5jw\\nE8fkIxZZ8DG0OEUL7ejnIA+NWhtmyRA58ErfBUDRmOihYZAV8nENjHHoQgtZObCw\\nY+Yv8qmdj7OIWzrmx7J7v9u4xzK0DW5m3SzClY0E4N2RR7seqjZggUvJgPIs06aO\\nFaeZ/peK0aRAwSfEV1iJ7Wd4ceVomo4MKr1UE80CgYBXwoQv+glZuKlfcTzqBE7G\\n87rRgRxfl4Y/2JgZy4NxSpTRm3+0KcirUxS1+KPxqB++NHY/uA3dg5o9oGLI57/t\\nvMIOn9wo8m/nSruWXOSqDaoUI7dd4sOmBomNr6FF7xPK9Lkqo89IrZT+yE3FTAjo\\nw6bS8+XBVcHSYRx5Cajq2Q==\\n-----END PRIVATE KEY-----\\n\",   \"client_email\": \"firebase-adminsdk-fbsvc@arpa3iv1.iam.gserviceaccount.com\",   \"client_id\": \"110273691399445029594\",   \"auth_uri\": \"https://accounts.google.com/o/oauth2/auth\",   \"token_uri\": \"https://oauth2.googleapis.com/token\",   \"auth_provider_x509_cert_url\": \"https://www.googleapis.com/oauth2/v1/certs\",   \"client_x509_cert_url\": \"https://www.googleapis.com/robot/v1/metadata/x509/firebase-adminsdk-fbsvc%40arpa3iv1.iam.gserviceaccount.com\",   \"universe_domain\": \"googleapis.com\" }",
+        "x": 870,
+        "y": 60,
+        "wires": [
+            [
+                "debug_push"
+            ]
+        ]
+    },
+    {
+        "id": "debug_push",
+        "type": "debug",
+        "z": "tab_app_v9_toolbar",
+        "name": "Status Envio",
+        "active": true,
+        "tosidebar": true,
+        "console": false,
+        "tostatus": false,
+        "complete": "payload",
+        "targetType": "msg",
+        "statusVal": "",
+        "statusType": "auto",
+        "x": 1050,
+        "y": 60,
+        "wires": []
+    },
+    {
+        "id": "backend_mqtt_in",
+        "type": "websocket in",
+        "z": "tab_app_v9_toolbar",
+        "name": "Receber do Servidor",
+        "server": "",
+        "client": "ws_client_esp32_v9",
+        "x": 150,
+        "y": 460,
+        "wires": [
+            [
+                "debug_esp32_raw",
+                "json_parse"
+            ]
+        ]
+    },
+    {
+        "id": "json_parse",
+        "type": "json",
+        "z": "tab_app_v9_toolbar",
+        "name": "",
+        "property": "payload",
+        "action": "",
+        "pretty": false,
+        "x": 330,
+        "y": 500,
+        "wires": [
+            [
+                "check_if_state"
+            ]
+        ]
+    },
+    {
+        "id": "check_if_state",
+        "type": "switch",
+        "z": "tab_app_v9_toolbar",
+        "name": "É ESTADO?",
+        "property": "payload.type",
+        "propertyType": "msg",
+        "rules": [
+            {
+                "t": "eq",
+                "v": "ESTADO",
+                "vt": "str"
+            }
+        ],
+        "checkall": "true",
+        "repair": false,
+        "outputs": 1,
+        "x": 490,
+        "y": 460,
+        "wires": [
+            [
+                "status_logic_text"
+            ]
+        ]
+    },
+    {
+        "id": "status_logic_text",
+        "type": "function",
+        "z": "tab_app_v9_toolbar",
+        "name": "Status para Texto Colorido",
+        "func": "var estado = msg.payload.payload.estado;\n\n// Configuração Padrão\nmsg.payload = \"DESCONHECIDO\";\nmsg.bgcolor = \"gray\";\nmsg.color = \"white\";\nmsg.icon = \"fa-question\";\n\n// IMPORTANTE: Deixar true para a cor ficar 100% sólida (se false, fica transparente/rosa)\nmsg.enabled = true; \n\nif (estado === \"FECHADO\") {\n    msg.payload = \"PORTÃO FECHADO\";\n    // Vermelho 100% Puro\n    msg.bgcolor = \"#FF0000\"; \n    msg.icon = \"fa-lock\";\n} \nelse if (estado === \"ABERTO\") {\n    msg.payload = \"PORTÃO ABERTO\";\n    // Verde Puro (Neon)\n    msg.bgcolor = \"#00C853\"; \n    msg.icon = \"fa-unlock\";\n} \nelse if (estado === \"EM_MOVIMENTO\") {\n    msg.payload = \"MOVENDO...\";\n    // Amarelo Ouro\n    msg.bgcolor = \"#FFD600\"; \n    msg.color = \"black\"; \n    msg.icon = \"fa-arrows-v\";\n} \nelse if (estado === \"ACIONADO\") {\n    msg.payload = \"COMANDO ENVIADO\";\n    // Azul Royal\n    msg.bgcolor = \"#2962FF\"; \n    msg.icon = \"fa-circle-o-notch fa-spin\";\n}\n\nreturn msg;",
+        "outputs": 1,
+        "timeout": 0,
+        "noerr": 0,
+        "initialize": "",
+        "finalize": "",
+        "libs": [],
+        "x": 720,
+        "y": 460,
+        "wires": [
+            [
+                "save_cached_status",
+                "940b686d1fa8ad98"
+            ]
+        ]
+    },
+    {
+        "id": "ui_btn_action",
+        "type": "ui_button",
+        "z": "tab_app_v9_toolbar",
+        "name": "",
+        "group": "group_home_main",
+        "order": 3,
+        "width": "6",
+        "height": "4",
+        "passthru": false,
+        "label": "⚡ ACIONAR PORTÃO",
+        "tooltip": "",
+        "color": "white",
+        "bgcolor": "#6200ea",
+        "className": "",
+        "icon": "",
+        "payload": "",
+        "payloadType": "str",
+        "topic": "topic",
+        "topicType": "msg",
+        "x": 170,
+        "y": 580,
+        "wires": [
+            [
+                "link_out_command"
+            ]
+        ]
+    },
+    {
+        "id": "ui_display_id_home",
+        "type": "ui_text",
+        "z": "tab_app_v9_toolbar",
+        "group": "group_home_main",
+        "order": 1,
+        "width": 0,
+        "height": 0,
+        "name": "Display ID Home",
+        "label": "ID:",
+        "format": "{{msg.payload}}",
+        "layout": "row-spread",
+        "x": 770,
+        "y": 200,
+        "wires": []
+    },
+    {
+        "id": "check_pass",
+        "type": "switch",
+        "z": "tab_app_v9_toolbar",
+        "name": "Senha",
+        "property": "payload",
+        "propertyType": "msg",
+        "rules": [
+            {
+                "t": "eq",
+                "v": "123",
+                "vt": "str"
+            },
+            {
+                "t": "else"
+            }
+        ],
+        "checkall": "true",
+        "repair": false,
+        "outputs": 2,
+        "x": 310,
+        "y": 1200,
+        "wires": [
+            [
+                "notify_ok",
+                "reset_pass_field",
+                "81bf9ec10053e1ed"
+            ],
+            [
+                "notify_fail"
+            ]
+        ]
+    },
+    {
+        "id": "notify_ok",
+        "type": "ui_toast",
+        "z": "tab_app_v9_toolbar",
+        "position": "top right",
+        "displayTime": "3",
+        "highlight": "",
+        "outputs": 0,
+        "raw": false,
+        "topic": "",
+        "name": "",
+        "x": 570,
+        "y": 1120,
+        "wires": []
+    },
+    {
+        "id": "notify_fail",
+        "type": "ui_toast",
+        "z": "tab_app_v9_toolbar",
+        "position": "top right",
+        "displayTime": "3",
+        "highlight": "",
+        "outputs": 0,
+        "raw": false,
+        "topic": "",
+        "name": "",
+        "x": 570,
+        "y": 1240,
+        "wires": []
+    },
+    {
+        "id": "reset_pass_field",
+        "type": "change",
+        "z": "tab_app_v9_toolbar",
+        "name": "Limpar Senha",
+        "rules": [
+            {
+                "t": "set",
+                "p": "payload",
+                "pt": "msg",
+                "to": "",
+                "tot": "str"
+            }
+        ],
+        "action": "",
+        "property": "",
+        "from": "",
+        "to": "",
+        "reg": false,
+        "x": 160,
+        "y": 1120,
+        "wires": [
+            [
+                "9f9c783a43e762e8"
+            ]
+        ]
+    },
+    {
+        "id": "ui_input_new_id",
+        "type": "ui_text_input",
+        "z": "tab_app_v9_toolbar",
+        "name": "Novo ID Input",
+        "label": "Novo ID do Portão:",
+        "group": "group_config_area",
+        "order": 1,
+        "width": 0,
+        "height": 0,
+        "mode": "text",
+        "delay": 300,
+        "topic": "",
+        "topicType": "str",
+        "x": 120,
+        "y": 1280,
+        "wires": [
+            [
+                "set_temp_id"
+            ]
+        ]
+    },
+    {
+        "id": "set_temp_id",
+        "type": "change",
+        "z": "tab_app_v9_toolbar",
+        "name": "Salva em Fluxo",
+        "rules": [
+            {
+                "t": "set",
+                "p": "temp_new_id",
+                "pt": "flow",
+                "to": "payload",
+                "tot": "msg"
+            }
+        ],
+        "action": "",
+        "property": "",
+        "from": "",
+        "to": "",
+        "reg": false,
+        "x": 320,
+        "y": 1280,
+        "wires": [
+            []
+        ]
+    },
+    {
+        "id": "ui_btn_save_id",
+        "type": "ui_button",
+        "z": "tab_app_v9_toolbar",
+        "name": "",
+        "group": "group_config_area",
+        "order": 2,
+        "width": 0,
+        "height": 0,
+        "passthru": false,
+        "label": "SALVAR ID",
+        "tooltip": "",
+        "color": "white",
+        "bgcolor": "#28a745",
+        "className": "",
+        "icon": "fa-floppy-o",
+        "payload": "",
+        "payloadType": "str",
+        "topic": "topic",
+        "topicType": "msg",
+        "x": 130,
+        "y": 1360,
+        "wires": [
+            [
+                "get_temp_id"
+            ]
+        ]
+    },
+    {
+        "id": "get_temp_id",
+        "type": "change",
+        "z": "tab_app_v9_toolbar",
+        "name": "Recupera ID",
+        "rules": [
+            {
+                "t": "set",
+                "p": "payload",
+                "pt": "msg",
+                "to": "temp_new_id",
+                "tot": "flow"
+            }
+        ],
+        "action": "",
+        "property": "",
+        "from": "",
+        "to": "",
+        "reg": false,
+        "x": 310,
+        "y": 1360,
+        "wires": [
+            [
+                "save_file_node",
+                "update_global",
+                "notify_saved",
+                "link_out_update_home"
+            ]
+        ]
+    },
+    {
+        "id": "save_file_node",
+        "type": "file",
+        "z": "tab_app_v9_toolbar",
+        "name": "",
+        "filename": "/data/config_id_portao.txt",
+        "filenameType": "str",
+        "appendNewline": false,
+        "createDir": false,
+        "overwriteFile": "true",
+        "encoding": "none",
+        "x": 570,
+        "y": 1360,
+        "wires": [
+            []
+        ]
+    },
+    {
+        "id": "update_global",
+        "type": "change",
+        "z": "tab_app_v9_toolbar",
+        "name": "Atualiza Global",
+        "rules": [
+            {
+                "t": "set",
+                "p": "id_portao",
+                "pt": "global",
+                "to": "payload",
+                "tot": "msg"
+            }
+        ],
+        "action": "",
+        "property": "",
+        "from": "",
+        "to": "",
+        "reg": false,
+        "x": 540,
+        "y": 1320,
+        "wires": [
+            []
+        ]
+    },
+    {
+        "id": "notify_saved",
+        "type": "ui_toast",
+        "z": "tab_app_v9_toolbar",
+        "position": "top right",
+        "displayTime": "3",
+        "highlight": "",
+        "outputs": 0,
+        "raw": false,
+        "topic": "",
+        "name": "",
+        "x": 550,
+        "y": 1400,
+        "wires": []
+    },
+    {
+        "id": "link_out_command",
+        "type": "link out",
+        "z": "tab_app_v9_toolbar",
+        "name": "Para Comando Portão",
+        "mode": "link",
+        "links": [
+            "link_in_backend_command"
+        ],
+        "x": 335,
+        "y": 580,
+        "wires": []
+    },
+    {
+        "id": "link_in_backend_command",
+        "type": "link in",
+        "z": "tab_app_v9_toolbar",
+        "name": "Recebe Comando do Botão",
+        "links": [
+            "link_out_command"
+        ],
+        "x": 435,
+        "y": 580,
+        "wires": [
+            [
+                "d02241cb04516c23"
+            ]
+        ]
+    },
+    {
+        "id": "d02241cb04516c23",
+        "type": "function",
+        "z": "tab_app_v9_toolbar",
+        "name": "Montar Comando Dinâmico",
+        "func": "var idAlvo = global.get(\"id_portao\");\nif (!idAlvo) return null;\n\nmsg.payload = {\n    \"type\": \"COMANDO\",\n    \"target\": idAlvo,\n    \"payload\": {\n        \"action\": \"PORTAO_ABRIR\"\n    }\n};\nreturn msg;",
+        "outputs": 1,
+        "timeout": 0,
+        "noerr": 0,
+        "initialize": "",
+        "finalize": "",
+        "libs": [],
+        "x": 620,
+        "y": 580,
+        "wires": [
+            [
+                "30e6ec50f928439f"
+            ]
+        ]
+    },
+    {
+        "id": "30e6ec50f928439f",
+        "type": "websocket out",
+        "z": "tab_app_v9_toolbar",
+        "name": "Enviar para Servidor",
+        "server": "",
+        "client": "ws_client_esp32_v9",
+        "x": 900,
+        "y": 580,
+        "wires": []
+    },
+    {
+        "id": "link_in_display_id",
+        "type": "link in",
+        "z": "tab_app_v9_toolbar",
+        "name": "Recebe ID para Display",
+        "links": [
+            "link_out_id_broadcast",
+            "link_out_update_home"
+        ],
+        "x": 635,
+        "y": 200,
+        "wires": [
+            [
+                "ui_display_id_home"
+            ]
+        ]
+    },
+    {
+        "id": "link_out_id_broadcast",
+        "type": "link out",
+        "z": "tab_app_v9_toolbar",
+        "name": "Broadcast ID Lido",
+        "mode": "link",
+        "links": [
+            "link_in_display_id"
+        ],
+        "x": 395,
+        "y": 240,
+        "wires": []
+    },
+    {
+        "id": "link_out_update_home",
+        "type": "link out",
+        "z": "tab_app_v9_toolbar",
+        "name": "Atualiza Home",
+        "mode": "link",
+        "links": [
+            "link_in_display_id"
+        ],
+        "x": 475,
+        "y": 1440,
+        "wires": []
+    },
+    {
+        "id": "force_update_on_exit",
+        "type": "change",
+        "z": "tab_app_v9_toolbar",
+        "name": "Ler Global",
+        "rules": [
+            {
+                "t": "set",
+                "p": "payload",
+                "pt": "msg",
+                "to": "id_portao",
+                "tot": "global"
+            }
+        ],
+        "action": "",
+        "property": "",
+        "from": "",
+        "to": "",
+        "reg": false,
+        "x": 330,
+        "y": 1440,
+        "wires": [
+            [
+                "link_out_update_home"
+            ]
+        ]
+    },
+    {
+        "id": "940b686d1fa8ad98",
+        "type": "ui_button",
+        "z": "tab_app_v9_toolbar",
+        "name": "Status Visual",
+        "group": "group_home_main",
+        "order": 2,
+        "width": "6",
+        "height": "2",
+        "passthru": false,
+        "label": "{{msg.payload}}",
+        "tooltip": "",
+        "color": "{{msg.color}}",
+        "bgcolor": "{{msg.bgcolor}}",
+        "className": "",
+        "icon": "{{msg.icon}}",
+        "payload": "",
+        "payloadType": "str",
+        "topic": "topic",
+        "topicType": "msg",
+        "x": 430,
+        "y": 300,
+        "wires": [
+            []
+        ]
+    },
+    {
+        "id": "9f9c783a43e762e8",
+        "type": "ui_text_input",
+        "z": "tab_app_v9_toolbar",
+        "name": "Senha Input",
+        "label": "Digite a Senha:",
+        "tooltip": "",
+        "group": "group_login",
+        "order": 1,
+        "width": 0,
+        "height": 0,
+        "passthru": true,
+        "mode": "password",
+        "delay": 0,
+        "topic": "",
+        "sendOnBlur": true,
+        "className": "",
+        "topicType": "str",
+        "x": 150,
+        "y": 1200,
+        "wires": [
+            [
+                "check_pass"
+            ]
+        ]
+    },
+    {
+        "id": "7c2f27e8b8b0e18e",
+        "type": "ui_button",
+        "z": "tab_app_v9_toolbar",
+        "name": "Botão Voltar Corrigido",
+        "group": "group_login",
+        "order": 2,
+        "width": 0,
+        "height": 0,
+        "passthru": false,
+        "label": "Voltar",
+        "tooltip": "",
+        "color": "black",
+        "bgcolor": "#e0e0e0",
+        "className": "",
+        "icon": "",
+        "payload": "0",
+        "payloadType": "num",
+        "topic": "topic",
+        "topicType": "msg",
+        "x": 580,
+        "y": 1480,
+        "wires": [
+            [
+                "340e2a01450ee9e9"
+            ]
+        ]
+    },
+    {
+        "id": "88cf183efbe2bdbd",
+        "type": "ui_button",
+        "z": "tab_app_v9_toolbar",
+        "name": "Botão Configurações Corrigido",
+        "group": "group_home_main",
+        "order": 4,
+        "width": 0,
+        "height": 0,
+        "passthru": false,
+        "label": "⚙️ Configurações",
+        "tooltip": "",
+        "color": "black",
+        "bgcolor": "#e0e0e0",
+        "className": "",
+        "icon": "",
+        "payload": "1",
+        "payloadType": "num",
+        "topic": "topic",
+        "topicType": "msg",
+        "x": 890,
+        "y": 1360,
+        "wires": [
+            [
+                "340e2a01450ee9e9"
+            ]
+        ]
+    },
+    {
+        "id": "81bf9ec10053e1ed",
+        "type": "change",
+        "z": "tab_app_v9_toolbar",
+        "name": "Ir para Cofre (Corrigido)",
+        "rules": [
+            {
+                "t": "set",
+                "p": "payload",
+                "pt": "msg",
+                "to": "2",
+                "tot": "num"
+            }
+        ],
+        "action": "",
+        "property": "",
+        "from": "",
+        "to": "",
+        "reg": false,
+        "x": 590,
+        "y": 1180,
+        "wires": [
+            [
+                "340e2a01450ee9e9"
+            ]
+        ]
+    },
+    {
+        "id": "6cf0d2e6d8e7bf4a",
+        "type": "ui_button",
+        "z": "tab_app_v9_toolbar",
+        "name": "Botão Sair Corrigido",
+        "group": "group_config_area",
+        "order": 3,
+        "width": 0,
+        "height": 0,
+        "passthru": false,
+        "label": "SAIR",
+        "tooltip": "",
+        "color": "white",
+        "bgcolor": "#dc3545",
+        "className": "",
+        "icon": "fa-sign-out",
+        "payload": "0",
+        "payloadType": "num",
+        "topic": "topic",
+        "topicType": "msg",
+        "x": 600,
+        "y": 1580,
+        "wires": [
+            [
+                "force_update_on_exit",
+                "340e2a01450ee9e9"
+            ]
+        ]
+    },
+    {
+        "id": "340e2a01450ee9e9",
+        "type": "ui_ui_control",
+        "z": "tab_app_v9_toolbar",
+        "name": "",
+        "events": "all",
+        "x": 840,
+        "y": 1460,
+        "wires": [
+            []
+        ]
+    },
+    {
+        "id": "debug_esp32_raw",
+        "type": "debug",
+        "z": "tab_app_v9_toolbar",
+        "name": "🔴 ESCUTA ESP32",
+        "active": true,
+        "tosidebar": true,
+        "console": false,
+        "tostatus": false,
+        "complete": "payload",
+        "targetType": "msg",
+        "statusVal": "",
+        "statusType": "auto",
+        "x": 380,
+        "y": 400,
+        "wires": []
+    },
+    {
+        "id": "http_in_dev_root",
+        "type": "http in",
+        "z": "tab_app_v9_toolbar",
+        "g": "group_proxy_granular",
+        "name": "GET /devices",
+        "url": "/devices",
+        "method": "get",
+        "upload": false,
+        "swaggerDoc": "",
+        "x": 150,
+        "y": 680,
+        "wires": [
+            [
+                "func_proxy_granular"
+            ]
+        ]
+    },
+    {
+        "id": "http_in_dev_sub",
+        "type": "http in",
+        "z": "tab_app_v9_toolbar",
+        "g": "group_proxy_granular",
+        "name": "POST /devices/:action",
+        "url": "/devices/:action",
+        "method": "post",
+        "upload": true,
+        "swaggerDoc": "",
+        "x": 170,
+        "y": 720,
+        "wires": [
+            [
+                "func_proxy_granular"
+            ]
+        ]
+    },
+    {
+        "id": "http_in_alerts_root",
+        "type": "http in",
+        "z": "tab_app_v9_toolbar",
+        "g": "group_proxy_granular",
+        "name": "GET /alerts",
+        "url": "/alerts",
+        "method": "get",
+        "upload": false,
+        "swaggerDoc": "",
+        "x": 150,
+        "y": 780,
+        "wires": [
+            [
+                "func_proxy_granular"
+            ]
+        ]
+    },
+    {
+        "id": "http_in_users_root",
+        "type": "http in",
+        "z": "tab_app_v9_toolbar",
+        "g": "group_proxy_granular",
+        "name": "GET /users",
+        "url": "/users",
+        "method": "get",
+        "upload": false,
+        "swaggerDoc": "",
+        "x": 150,
+        "y": 840,
+        "wires": [
+            [
+                "func_proxy_granular"
+            ]
+        ]
+    },
+    {
+        "id": "http_in_users_sub",
+        "type": "http in",
+        "z": "tab_app_v9_toolbar",
+        "g": "group_proxy_granular",
+        "name": "POST /users/:action",
+        "url": "/users/:action",
+        "method": "post",
+        "upload": true,
+        "swaggerDoc": "",
+        "x": 170,
+        "y": 880,
+        "wires": [
+            [
+                "func_proxy_granular"
+            ]
+        ]
+    },
+    {
+        "id": "http_in_login",
+        "type": "http in",
+        "z": "tab_app_v9_toolbar",
+        "g": "group_proxy_granular",
+        "name": "POST /login",
+        "url": "/login",
+        "method": "post",
+        "upload": true,
+        "swaggerDoc": "",
+        "x": 150,
+        "y": 940,
+        "wires": [
+            [
+                "func_proxy_granular"
+            ]
+        ]
+    },
+    {
+        "id": "http_in_ack",
+        "type": "http in",
+        "z": "tab_app_v9_toolbar",
+        "g": "group_proxy_granular",
+        "name": "POST /acknowledge",
+        "url": "/acknowledge",
+        "method": "post",
+        "upload": true,
+        "swaggerDoc": "",
+        "x": 170,
+        "y": 1000,
+        "wires": [
+            [
+                "func_proxy_granular"
+            ]
+        ]
+    },
+    {
+        "id": "http_in_elderly_root",
+        "type": "http in",
+        "z": "tab_app_v9_toolbar",
+        "g": "group_proxy_granular",
+        "name": "GET /elderly",
+        "url": "/elderly",
+        "method": "get",
+        "upload": false,
+        "swaggerDoc": "",
+        "x": 430,
+        "y": 680,
+        "wires": [
+            [
+                "func_proxy_granular"
+            ]
+        ]
+    },
+    {
+        "id": "http_in_elderly_sub",
+        "type": "http in",
+        "z": "tab_app_v9_toolbar",
+        "g": "group_proxy_granular",
+        "name": "POST /elderly/:action",
+        "url": "/elderly/:action",
+        "method": "post",
+        "upload": true,
+        "swaggerDoc": "",
+        "x": 450,
+        "y": 720,
+        "wires": [
+            [
+                "func_proxy_granular"
+            ]
+        ]
+    },
+    {
+        "id": "func_proxy_granular",
+        "type": "function",
+        "z": "tab_app_v9_toolbar",
+        "g": "group_proxy_granular",
+        "name": "Proxy Logic (IP 192.168.2.131)",
+        "func": "// Configuração do ESP32\nconst ESP32_IP = \"192.168.2.131\";\nconst ESP32_PORT = \"86\";\n\n// Monta a URL (preserva query params e subpaths)\nmsg.url = `http://${ESP32_IP}:${ESP32_PORT}${msg.req.url}`;\nmsg.method = msg.req.method;\n\n// Headers Essenciais (Allowlist)\nconst allowed = ['content-type','authorization','accept','user-agent','x-api-key'];\nconst h = {};\nif(msg.req.headers) {\n    allowed.forEach(k => { if(msg.req.headers[k]) h[k] = msg.req.headers[k]; });\n}\n\n// Corrige Content-Type para POSTs\nif (!h['content-type'] && (msg.method === 'POST' || msg.method === 'PUT')) {\n    h['content-type'] = 'application/json';\n}\n\nmsg.headers = h;\nmsg.payload = msg.req.body;\n\nreturn msg;",
+        "outputs": 1,
+        "timeout": 0,
+        "noerr": 0,
+        "initialize": "",
+        "finalize": "",
+        "libs": [],
+        "x": 590,
+        "y": 840,
+        "wires": [
+            [
+                "http_req_granular"
+            ]
+        ]
+    },
+    {
+        "id": "http_req_granular",
+        "type": "http request",
+        "z": "tab_app_v9_toolbar",
+        "g": "group_proxy_granular",
+        "name": "Repassar",
+        "method": "use",
+        "ret": "obj",
+        "paytoqs": "ignore",
+        "url": "",
+        "tls": "",
+        "persist": false,
+        "proxy": "",
+        "insecureHTTPParser": false,
+        "authType": "",
+        "senderr": false,
+        "headers": [],
+        "x": 800,
+        "y": 840,
+        "wires": [
+            [
+                "http_res_granular"
+            ]
+        ]
+    },
+    {
+        "id": "http_res_granular",
+        "type": "http response",
+        "z": "tab_app_v9_toolbar",
+        "g": "group_proxy_granular",
+        "name": "Resposta",
+        "statusCode": "",
+        "headers": {},
+        "x": 960,
+        "y": 840,
+        "wires": []
+    },
+    {
+        "id": "4172cea52b45fefc",
+        "type": "global-config",
+        "env": [],
+        "modules": {
+            "node-red-dashboard": "3.6.6",
+            "node-red-contrib-cloud-firestore": "3.2.0",
+            "node-red-contrib-firebase-messaging-advanced": "1.0.0"
+        }
+    }
+]
