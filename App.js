@@ -43,6 +43,7 @@ export default function App() {
   const [user, setUser] = useState(null); // Estado para controlar o usuário logado
   const [pendingNav, setPendingNav] = useState(null); // guarda navegação pendente ao clicar na notificação sem sessão
   const [themeName, setThemeName] = useState('dark');
+  const [appMode, setAppMode] = useState('admin'); // admin | elderly
 
   // --- ADICIONADO ---
   // Ref para navegar ao clicar na notificação
@@ -60,6 +61,8 @@ export default function App() {
         }
         const savedTheme = await AsyncStorage.getItem('app_theme');
         if (savedTheme) setThemeName(savedTheme);
+        const savedAppMode = await AsyncStorage.getItem('@app_mode');
+        if (savedAppMode) setAppMode(savedAppMode);
       } catch (e) {
         console.warn("Falha ao carregar sessão persistida:", e);
       }
@@ -222,6 +225,7 @@ export default function App() {
                     {...props}
                     user={user}
                     themeName={themeName}
+                    appMode={appMode}
                   />
                 )}
               </Stack.Screen>
@@ -267,6 +271,7 @@ export default function App() {
                     {...props}
                     user={user}
                     themeName={themeName}
+                    appMode={appMode}
                     onLogout={handleLogout}
                     onChangeTheme={async (name) => {
                       setThemeName(name);
@@ -274,6 +279,14 @@ export default function App() {
                         await AsyncStorage.setItem('app_theme', name);
                       } catch (e) {
                         console.warn('Falha ao salvar tema', e);
+                      }
+                    }}
+                    onChangeAppMode={async (mode) => {
+                      setAppMode(mode);
+                      try {
+                        await AsyncStorage.setItem('@app_mode', mode);
+                      } catch (e) {
+                        console.warn('Falha ao salvar modo de app', e);
                       }
                     }}
                   />

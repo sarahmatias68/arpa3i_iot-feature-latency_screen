@@ -6,7 +6,7 @@ import { ConnectionStatusBanner } from './ConnectionStatusBanner';
 import DeviceTypeSelector from './DeviceTypeSelector';
 import { getTheme, typography } from './theme';
 
-export default function MainScreen({ navigation, user, themeName = 'dark' }) {
+export default function MainScreen({ navigation, user, themeName = 'dark', appMode }) {
   const {
     connectionStatus,
     sensorState,
@@ -19,7 +19,7 @@ export default function MainScreen({ navigation, user, themeName = 'dark' }) {
     dismissActiveAlert,
     devicesById,
     requestSystemBroadcast,
-    enviarComando, // <--- ADICIONADO: Importando função de comando
+    enviarComando,
   } = useAlerts();
 
   const [typeSelectorVisible, setTypeSelectorVisible] = useState(false);
@@ -380,6 +380,45 @@ export default function MainScreen({ navigation, user, themeName = 'dark' }) {
     );
   };
   
+  const renderElderlyMode = () => {
+    // Encontra o primeiro dispositivo de pulseira para o botão de pânico
+    const pulseiraDevice = pulseiraDevices.length > 0 ? pulseiraDevices[0] : null;
+
+    const handlePanicPress = () => {
+      if (!pulseiraDevice) {
+        Alert.alert("Erro", "Nenhuma pulseira de pânico configurada.");
+        return;
+      }
+      Alert.alert(
+        "Confirmar Pânico",
+        "Tem certeza de que deseja enviar um alerta de pânico?",
+        [
+          { text: "Cancelar", style: "cancel" },
+          { 
+            text: "SIM, SOCORRO!",
+            onPress: () => enviarComando(pulseiraDevice.deviceId, 'PANICO'),
+            style: "destructive"
+          }
+        ]
+      );
+    };
+
+    return (
+      <View style={styles.containerelderly}>
+      {renderGateButton()}
+        <TouchableOpacity 
+          style={styles.panicButton} 
+          onPress={handlePanicPress}
+          activeOpacity={0.8}
+        >
+          <Ionicons name="pulse-outline" size={80} color="#ffffff" />
+          <Text style={styles.panicButtonText}>PÂNICO</Text>
+          <Text style={styles.panicButtonSubText}>Pressione em caso de emergência</Text>
+        </TouchableOpacity>
+      </View>
+    );
+  };
+
   return (
     <View style={styles.container}>
       <StatusBar barStyle={themeName === 'light' ? 'dark-content' : 'light-content'} />
@@ -387,76 +426,78 @@ export default function MainScreen({ navigation, user, themeName = 'dark' }) {
 
       <ScrollView 
         style={styles.scrollView}
-        contentContainerStyle={styles.scrollContent}
+        contentContainerStyle={appMode === 'elderly' ? styles.elderlyScrollContent : styles.scrollContent}
         showsVerticalScrollIndicator={false}
       >
-        {renderServerCard()}
-
-        {renderGateButton()}
-
-
-        {newDevices.length > 0 && (
-          <View style={styles.newDevicesSection}>
-            <View style={styles.newDevicesHeaderRow}>
-              <Ionicons
-                name="construct-outline"
-                size={24}
-                color={theme.colors.primary}
-                style={styles.newDevicesIcon}
-              />
-              <Text style={styles.newDevicesHeader}>Dispositivos Novos</Text>
-            </View>
-            <Text style={styles.newDevicesSubtitle}>
-              Estes dispositivos precisam ter o tipo definido
-            </Text>
-            {renderDeviceGroup(newDevices)}
-          </View>
-        )}
-
-        {renderCategoryButton(
-          'Sensores de Gás e Fumaça',
-          'flame-outline',
-          sensorDevices,
-          'sensores',
-          (() => {
-            if (sensorState === 'Vazamento de Gás') {
-              return { text: 'Gás Detectado', bg: '#7f1d1d' };
-            }
-            if (sensorState === 'Fumaça Detectada') {
-              return { text: 'Fumaça Detectada', bg: '#7f1d1d' };
-            }
-            return { text: null, bg: null };
-          })(),
-          (sensorState === 'Vazamento de Gás' || sensorState === 'Fumaça Detectada') ? null : 'Ambiente Seguro'
-        )}
-        {renderCategoryButton(
-          'Pulseiras Assistivas',
-          'watch-outline',
-          pulseiraDevices,
-          'pulseira',
-          (() => {
-            const hasPanic = pulseiraDevices.some(d => d.lastAlertType === 'PANICO');
-            return hasPanic ? { text: 'Socorro Solicitado', bg: '#7f1d1d' } : { text: null, bg: null };
-          })()
-        )}
-        {renderCategoryButton(
-          'Detectores de Queda',
-          'body-outline',
-          detectorDevices,
-          'detector',
-          (() => {
-            const hasFall = detectorDevices.some(d => d.lastAlertType === 'QUEDA');
-            return hasFall ? { text: 'Queda Detectada', bg: '#7f1d1d' } : { text: null, bg: null };
-          })()
-        )}
-        {renderCategoryButton(
-          'Automação',
-          'build-outline',
-          automacaoDevices,
-          'automacao',
-          (() => {
-            return { text: null, bg: null };
-          })()
+        {appMode === 'elderly' ? (
+          renderElderlyMode()
+        ) : (
+          <>
+            {renderServerCard()}
+            {renderGateButton()}
+            {newDevices.length > 0 && (
+              <View style={styles.newDevicesSection}>
+                <View style={styles.newDevicesHeaderRow}>
+                  <Ionicons
+                    name="construct-outline"
+                    size={24}
+                    color={theme.colors.primary}
+                    style={styles.newDevicesIcon}
+                  />
+                  <Text style={styles.newDevicesHeader}>Dispositivos Novos</Text>
+                </View>
+                <Text style={styles.newDevicesSubtitle}>
+                  Estes dispositivos precisam ter o tipo definido
+                </Text>
+                {renderDeviceGroup(newDevices)}
+              </View>
+            )}
+            {renderCategoryButton(
+              'Sensores de Gás e Fumaça',
+              'flame-outline',
+              sensorDevices,
+              'sensores',
+              (() => {
+                if (sensorState === 'Vazamento de Gás') {
+                  return { text: 'Gás Detectado', bg: '#7f1d1d' };
+                }
+                if (sensorState === 'Fumaça Detectada') {
+                  return { text: 'Fumaça Detectada', bg: '#7f1d1d' };
+                }
+                return { text: null, bg: null };
+              })(),
+              (sensorState === 'Vazamento de Gás' || sensorState === 'Fumaça Detectada') ? null : 'Ambiente Seguro'
+            )}
+            {renderCategoryButton(
+              'Pulseiras Assistivas',
+              'watch-outline',
+              pulseiraDevices,
+              'pulseira',
+              (() => {
+                const hasPanic = pulseiraDevices.some(d => d.lastAlertType === 'PANICO');
+                return hasPanic ? { text: 'Socorro Solicitado', bg: '#7f1d1d' } : { text: null, bg: null };
+              })()
+            )}
+            {renderCategoryButton(
+              'Detectores de Queda',
+              'body-outline',
+              detectorDevices,
+              'detector',
+              (() => {
+                const hasFall = detectorDevices.some(d => d.lastAlertType === 'QUEDA');
+                return hasFall ? { text: 'Queda Detectada', bg: '#7f1d1d' } : { text: null, bg: null };
+              })()
+            )}
+            {renderCategoryButton(
+              'Automação',
+              'build-outline',
+              automacaoDevices,
+              'automacao',
+              (() => {
+                return { text: null, bg: null };
+              })()
+            )}
+          </>
         )}
       </ScrollView>
 
@@ -509,6 +550,51 @@ const createStyles = (theme) => StyleSheet.create({
     alignItems: 'center',
     flexGrow: 1,
     justifyContent: 'center',
+  },
+  elderlyScrollContent: {
+    padding: 20,
+    paddingBottom: 40,
+    alignItems: 'center',
+    flexGrow: 1,
+    justifyContent: 'center',
+    gap: 20,
+  },
+  containerelderly: {
+    flex: 1,
+    justifyContent: 'space-around',
+    gap: 20,
+    alignItems: 'center',
+    width: '100%',
+  },
+  panicButton: {
+    width: '60%',
+    maxWidth: 220,
+    minWidth: 220,     
+    aspectRatio: 1,
+    backgroundColor: theme.colors.danger,
+    borderRadius: 9999, // Círculo
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+    marginBottom: 20,
+    elevation: 8,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
+    
+  },
+  panicButtonText: {
+    color: '#ffffff',
+    fontSize: 30,
+    fontWeight: 'bold',
+    letterSpacing: 2,
+  },
+  panicButtonSubText: {
+    color: 'rgba(255, 255, 255, 0.9)',
+    fontSize: 16,
+    marginTop: 8,
+    textAlign: 'center',
   },
   // --- ESTILOS DO BOTÃO DE PORTÃO REORGANIZADOS ---
   gateButton: {
@@ -625,9 +711,15 @@ const createStyles = (theme) => StyleSheet.create({
     position: 'relative',
     borderWidth: 1,
     borderColor: theme.colors.border,
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.2,
+    shadowRadius: 1.41,
   },
   categoryContent: {
     alignItems: 'center',
+    justifyContent: 'center',
   },
   categoryIcon: {
     marginBottom: 12,
@@ -642,6 +734,7 @@ const createStyles = (theme) => StyleSheet.create({
     color: theme.colors.textSecondary,
     marginTop: 6,
     textAlign: 'center',
+    marginBottom: 5,
   },
   alertBadge: {
     position: 'absolute',
@@ -665,6 +758,17 @@ const createStyles = (theme) => StyleSheet.create({
     backgroundColor: theme.colors.card,
     borderRadius: 12,
     padding: 15,
+    marginBottom: 10,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+  },
+  cardPanicActive: {
+    backgroundColor: '#4c0519',
+    borderColor: '#ef4444',
+  },
+  cardFallActive: {
+    backgroundColor: '#4a2c0d',
+    borderColor: '#f59e0b',
   },
   deviceHeader: {
     flexDirection: 'row',
@@ -724,6 +828,7 @@ const createStyles = (theme) => StyleSheet.create({
   subStatus: {
     marginTop: 6,
     ...typography.smallStrong,
+    marginBottom: 5,
   },
   deviceInfoBlock: {
     marginTop: 12,
@@ -779,8 +884,11 @@ const createStyles = (theme) => StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 8,
     borderRadius: 8,
+    paddingVertical: 10,
+    paddingHorizontal: 20,
   },
   alertButtonText: {
+    ...typography.button,
     color: '#ffffff',
     fontWeight: 'bold',
     fontSize: 14,

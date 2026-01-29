@@ -3,7 +3,7 @@ import { useMemo } from 'react';
 import { Ionicons } from '@expo/vector-icons';
 import { getTheme, typography } from './theme';
 
-const SettingsScreen = ({ navigation, onLogout, themeName = 'dark', onChangeTheme }) => {
+const SettingsScreen = ({ navigation, onLogout, themeName = 'dark', onChangeTheme, appMode, onChangeAppMode }) => {
   const theme = useMemo(() => getTheme(themeName), [themeName]);
   const styles = useMemo(() => createStyles(theme), [theme]);
   const menuItems = [
@@ -32,6 +32,24 @@ const SettingsScreen = ({ navigation, onLogout, themeName = 'dark', onChangeThem
         >
           <Ionicons name="moon-outline" size={18} color={themeName === 'dark' ? theme.colors.text : theme.colors.textSecondary} style={{ marginRight: 6 }} />
           <Text style={styles.themeButtonText}>Escuro</Text>
+        </TouchableOpacity>
+      </View>
+
+      <Text style={styles.sectionTitle}>Modo de Exibição</Text>
+      <View style={styles.themeRow}>
+        <TouchableOpacity
+          style={[styles.themeButton, appMode === 'admin' && styles.themeButtonActive]}
+          onPress={() => onChangeAppMode && onChangeAppMode('admin')}
+        >
+          <Ionicons name="construct-outline" size={18} color={appMode === 'admin' ? theme.colors.text : theme.colors.textSecondary} style={{ marginRight: 6 }} />
+          <Text style={styles.themeButtonText}>ADMIN</Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[styles.themeButton, appMode === 'elderly' && styles.themeButtonActive]}
+          onPress={() => onChangeAppMode && onChangeAppMode('elderly')}
+        >
+          <Ionicons name="body-outline" size={18} color={appMode === 'elderly' ? theme.colors.text : theme.colors.textSecondary} style={{ marginRight: 6 }} />
+          <Text style={styles.themeButtonText}>ELDERLY</Text>
         </TouchableOpacity>
       </View>
 
