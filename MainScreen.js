@@ -42,35 +42,30 @@ export default function MainScreen({ navigation, user, themeName = 'dark', appMo
 
 
   const prevStatusRef = useRef(connectionStatus);
+  // Sincronização Inicial (Handshake)
   useEffect(() => {
-    if (prevStatusRef.current !== connectionStatus) {
-      if (connectionStatus === 'Desconectado') {
-        setShowDisconnectModal(true);
-      } else if (connectionStatus === 'Conectado') {
-        setShowDisconnectModal(false);
-        
-        // --- INÍCIO DO PROTOCOLO UNIVERSAL DE AUTOMAÇÃO ---
-        console.log('Conexão estabelecida. Iniciando Handshake de Automação...');
-        
-        // 1. Solicita telemetria geral de todos os dispositivos
-        requestSystemBroadcast();
+    if (connectionStatus === 'Connected' || connectionStatus === 'Conectado') {
+      console.log('Conectado! Solicitando status dos dispositivos...');
+      
+      // 1. Solicita Broadcast geral (Telemetria)
+      requestSystemBroadcast();
 
-        // 2. Itera sobre todos os dispositivos conhecidos para solicitar status de automação
-        if (devicesById) {
-          Object.values(devicesById).forEach(device => {
-            // Verifica se é um dispositivo de automação ou um portão
-            if (device.deviceType === 'automacao' || device.deviceId.startsWith('Portao')) {
-              console.log(`Enviando GET_STATUS para o dispositivo de automação: ${device.deviceId}`);
-              enviarComando(device.deviceId, 'GET_STATUS');
-            }
-          });
-        }
-        // --- FIM DO PROTOCOLO ---
-
+      // 2. CORREÇÃO: Força a busca do status do Portão Principal imediatamente
+      // (Mesmo que ele ainda não esteja na lista devicesById)
+      if (TARGET_GATE_ID) {
+        enviarComando(TARGET_GATE_ID, 'GET_STATUS');
       }
-      prevStatusRef.current = connectionStatus;
+
+      // 3. Opcional: Busca status de outros dispositivos que já estejam na memória
+      if (devicesById) {
+         Object.values(devicesById).forEach(device => {
+            if (device.deviceType === 'automacao' && device.deviceId !== TARGET_GATE_ID) {
+               enviarComando(device.deviceId, 'GET_STATUS');
+            }
+         });
+      }
     }
-  }, [connectionStatus, devicesById, requestSystemBroadcast, enviarComando]); 
+  }, [connectionStatus, requestSystemBroadcast, enviarComando, devicesById]); // Adicione as dependências
 
 
   // --- LÓGICA DO PORTÃO ---
