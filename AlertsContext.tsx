@@ -838,35 +838,24 @@ export const AlertsProvider: React.FC<AlertsProviderProps> = ({
     }
   }, [connectionStatus]); // Dependência estável
 
-// --- HANDSHAKE AUTOMÁTICO (CORREÇÃO DEFINITIVA) ---
+// --- HANDSHAKE V2 (MODO HUB) ---
   useEffect(() => {
-    // 1. Reset da trava se cair a conexão
+    // 1. Reset da trava
     if (connectionStatus !== 'Conectado') {
       hasHandshaked.current = false;
       return;
     }
 
-    // 2. Se conectou e AINDA NÃO fez handshake nesta sessão
+    // 2. Conectou? Pede o Cache para o Servidor
     if (connectionStatus === 'Conectado' && !hasHandshaked.current) {
-      console.log("🎮 [Context] Conectado. Iniciando Sincronização Ativa (Single Shot)...");
-      hasHandshaked.current = true; // <--- TRAVA DE SEGURANÇA (Impede o Loop)
+      console.log("🎮 [App] Conectado ao Hub. Solicitando Cache...");
+      hasHandshaked.current = true;
 
-      // (Opcional) Mantemos o broadcast caso o servidor venha a suportar no futuro
+      // Envia APENAS o broadcast. 
+      // O Servidor (novo código) vai responder com o estado do portão.
       requestSystemBroadcast();
-
-      // 3. A SOLUÇÃO: Enviar GET_STATUS explicitamente, mas PROTEGIDO pela trava.
-      // Isso força o portão a responder "AGORA", resolvendo o "Sincronizando..."
-      const timer = setTimeout(() => {
-         // Verifica se o socket está realmente aberto para evitar erros
-         if (ws.current?.ws?.readyState === WebSocket.OPEN) {
-            console.log(`📤 [Handshake] Enviando GET_STATUS para: ${MAIN_GATE_ID}`);
-            enviarComando(MAIN_GATE_ID, 'GET_STATUS');
-         }
-      }, 500);
-
-      return () => clearTimeout(timer);
     }
-  }, [connectionStatus, requestSystemBroadcast, enviarComando]);
+  }, [connectionStatus, requestSystemBroadcast]);
 
   const value: AlertsContextType = {
     connectionStatus,
