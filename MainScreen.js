@@ -42,30 +42,7 @@ export default function MainScreen({ navigation, user, themeName = 'dark', appMo
 
 
   const prevStatusRef = useRef(connectionStatus);
-  // Sincronização Inicial (Handshake)
-  useEffect(() => {
-    if (connectionStatus === 'Connected' || connectionStatus === 'Conectado') {
-      console.log('Conectado! Solicitando status dos dispositivos...');
-      
-      // 1. Solicita Broadcast geral (Telemetria)
-      requestSystemBroadcast();
 
-      // 2. CORREÇÃO: Força a busca do status do Portão Principal imediatamente
-      // (Mesmo que ele ainda não esteja na lista devicesById)
-      if (TARGET_GATE_ID) {
-        enviarComando(TARGET_GATE_ID, 'GET_STATUS');
-      }
-
-      // 3. Opcional: Busca status de outros dispositivos que já estejam na memória
-      if (devicesById) {
-         Object.values(devicesById).forEach(device => {
-            if (device.deviceType === 'automacao' && device.deviceId !== TARGET_GATE_ID) {
-               enviarComando(device.deviceId, 'GET_STATUS');
-            }
-         });
-      }
-    }
-  }, [connectionStatus, requestSystemBroadcast, enviarComando, devicesById]); // Adicione as dependências
 
 
   // --- LÓGICA DO PORTÃO ---

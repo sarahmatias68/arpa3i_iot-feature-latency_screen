@@ -11,7 +11,7 @@ import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { WsConnection } from "./wsConnection";
 import { User } from "./types/model";
-
+const MAIN_GATE_ID = "Portao_6C0878";
 // --- TIPOS ---
 interface FallDetails {
   status: "Queda Detectada";
@@ -123,6 +123,7 @@ export const AlertsProvider: React.FC<AlertsProviderProps> = ({
   const [wristbandPanicActive, setWristbandPanicActive] = useState<boolean>(false);
   const [devicesById, setDevicesById] = useState<Record<string, DeviceStatus>>({});
   const ws = useRef<WsConnection | null>(null);
+  const hasHandshaked = useRef(false);
 
   const deviceTypes: DeviceTypeConfig[] = [
     { id: "pulseira", name: "Pulseira Assistiva", color: "#3b82f6", icon: "watch-outline" },
@@ -736,8 +737,8 @@ export const AlertsProvider: React.FC<AlertsProviderProps> = ({
     }
   };
 
-  // Solicita explicitamente um broadcast de status dos dispositivos
-  const requestSystemBroadcast = () => {
+// CORREÇÃO: Adicionado useCallback para impedir recriação da função
+  const requestSystemBroadcast = useCallback(() => {
     try {
       if (ws.current?.ws?.readyState === WebSocket.OPEN) {
         const message = JSON.stringify({
@@ -754,7 +755,7 @@ export const AlertsProvider: React.FC<AlertsProviderProps> = ({
     } catch (e) {
       console.error("Falha ao solicitar SYSTEM_BROADCAST:", e);
     }
-  };
+  }, [user]); // Dependência estável
 
   // Adiciona manualmente um dispositivo ao registro local e persiste
   const addDevice = async (deviceId: string) => {
@@ -820,7 +821,8 @@ export const AlertsProvider: React.FC<AlertsProviderProps> = ({
     });
   };
 
-  const enviarComando = (targetId: string, action: string) => {
+// CORREÇÃO: Adicionado useCallback para impedir loop no useEffect
+  const enviarComando = useCallback((targetId: string, action: string) => {
     if (ws.current?.ws && connectionStatus === "Conectado") {
       const payload = {
         type: "COMANDO",
@@ -834,7 +836,37 @@ export const AlertsProvider: React.FC<AlertsProviderProps> = ({
     } else {
       console.log("Erro: Socket desconectado. Não foi possível enviar.");
     }
-  };
+  }, [connectionStatus]); // Dependência estável
+
+// --- HANDSHAKE AUTOMÁTICO (CORREÇÃO DEFINITIVA) ---
+  useEffect(() => {
+    // 1. Reset da trava se cair a conexão
+    if (connectionStatus !== 'Conectado') {
+      hasHandshaked.current = false;
+      return;
+    }
+
+    // 2. Se conectou e AINDA NÃO fez handshake nesta sessão
+    if (connectionStatus === 'Conectado' && !hasHandshaked.current) {
+      console.log("🎮 [Context] Conectado. Iniciando Sincronização Ativa (Single Shot)...");
+      hasHandshaked.current = true; // <--- TRAVA DE SEGURANÇA (Impede o Loop)
+
+      // (Opcional) Mantemos o broadcast caso o servidor venha a suportar no futuro
+      requestSystemBroadcast();
+
+      // 3. A SOLUÇÃO: Enviar GET_STATUS explicitamente, mas PROTEGIDO pela trava.
+      // Isso força o portão a responder "AGORA", resolvendo o "Sincronizando..."
+      const timer = setTimeout(() => {
+         // Verifica se o socket está realmente aberto para evitar erros
+         if (ws.current?.ws?.readyState === WebSocket.OPEN) {
+            console.log(`📤 [Handshake] Enviando GET_STATUS para: ${MAIN_GATE_ID}`);
+            enviarComando(MAIN_GATE_ID, 'GET_STATUS');
+         }
+      }, 500);
+
+      return () => clearTimeout(timer);
+    }
+  }, [connectionStatus, requestSystemBroadcast, enviarComando]);
 
   const value: AlertsContextType = {
     connectionStatus,
