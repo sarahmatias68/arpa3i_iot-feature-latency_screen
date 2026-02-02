@@ -7,14 +7,14 @@ interface ConnectionStatusBannerProps {
 export const ConnectionStatusBanner = ({
   status,
 }: ConnectionStatusBannerProps) => {
-  if (status === "Conectado" || status === "") {
-    return null; // Don't show anything if connected
+  // 1. SILENT MODE: Se estiver Conectado, Vazio ou Conectando, não mostra nada no topo
+  if (status === "Conectado" || status === "" || status === "Conectando...") {
+    return null; 
   }
 
   const getBannerStyle = () => {
     switch (status) {
-      case "Conectando...":
-        return styles.connecting;
+      // O case "Conectando..." foi removido pois já retornamos null acima
       case "Desconectado":
         return styles.disconnected;
       default:
@@ -39,7 +39,7 @@ const styles = StyleSheet.create({
     zIndex: 1000,
   },
   connecting: {
-    backgroundColor: "#facc15", // Yellow
+    backgroundColor: "#facc15", // Yellow (Não usado mais no banner)
   },
   disconnected: {
     backgroundColor: "#ef4444", // Red

@@ -1,5 +1,5 @@
-import { View, Text, StyleSheet, StatusBar, TouchableOpacity, ScrollView, Modal, Alert } from 'react-native';
-import { useMemo, useState, useEffect, useRef } from 'react';
+import { View, Text, StyleSheet, StatusBar, TouchableOpacity, ScrollView, Modal, Alert, TextInput } from 'react-native';
+import { useMemo, useState, useEffect, useRef, useLayoutEffect } from 'react';
 import { Ionicons } from '@expo/vector-icons';
 import { useAlerts, SERVER_DEVICE_PATTERN } from './AlertsContext';
 import { ConnectionStatusBanner } from './ConnectionStatusBanner';
@@ -20,6 +20,7 @@ export default function MainScreen({ navigation, user, themeName = 'dark', appMo
     devicesById,
     requestSystemBroadcast,
     enviarComando,
+    getDeviceTypesList,
   } = useAlerts();
 
   const [typeSelectorVisible, setTypeSelectorVisible] = useState(false);
@@ -27,96 +28,151 @@ export default function MainScreen({ navigation, user, themeName = 'dark', appMo
   const [serverExpanded, setServerExpanded] = useState(false);
   const theme = useMemo(() => getTheme(themeName), [themeName]);
   const styles = useMemo(() => createStyles(theme), [theme]);
-
+  const groupedDevices = getDevicesByType();
+  const newDevices = getNewDevices();
   // Detecta o dispositivo do servidor central por nome (servidor/server)
   const serverDevice = useMemo(() => {
     if (!devicesById) return null;
-    const ids = Object.keys(devicesById);
-    const matchId = ids.find(id => SERVER_DEVICE_PATTERN.test(id));
-    return matchId ? devicesById[matchId] : null;
+    // REGRA ESTRITA: Só retorna se o tipo for explicitamente 'servidor'
+    return Object.values(devicesById).find(d => d.deviceType === 'servidor');
   }, [devicesById]);
 
   // Modal de desconexão do servidor
   const [showDisconnectModal, setShowDisconnectModal] = useState(false);
 
-
-
   const prevStatusRef = useRef(connectionStatus);
 
+  // --- LÓGICA DE SENHA PARA CONFIGURAÇÕES ---
+  const [passwordModalVisible, setPasswordModalVisible] = useState(false);
+  const [passwordInput, setPasswordInput] = useState('');
 
-
-  // --- LÓGICA DO PORTÃO ---
-  const TARGET_GATE_ID = 'Portao_6C0878'; // ID fixo do dispositivo do portão
-  const gateDevice = devicesById[TARGET_GATE_ID];
-  const gateState = gateDevice?.gateState;
-
-
-  const handleGateAction = () => {
-    const isOpening = (gateState === 'FECHADO');
-    const alertText = isOpening ? 'abrir' : 'fechar';
-    const alertTitle = isOpening ? 'ABRIR' : 'FECHAR';
-
-    Alert.alert(
-      `Confirmar Ação`,
-      `Deseja realmente ${alertText} o portão?`,
-      [
-        { text: "Cancelar", style: "cancel" },
-        { 
-          text: alertTitle,
-          onPress: () => {
-            // O comando é sempre ABRIR, pois o motor funciona com pulso
-            enviarComando(TARGET_GATE_ID, 'PORTAO_ABRIR');
-          }
-        }
-      ]
-    );
+  const handleSettingsPress = () => {
+    if (appMode === 'elderly') {
+      // Se for idoso, pede senha
+      setPasswordInput(''); // Limpa campo anterior
+      setPasswordModalVisible(true);
+    } else {
+      // Modo normal, entra direto
+      navigation.navigate('Settings');
+    }
   };
 
-  const renderGateButton = () => {
-    let buttonStyle = styles.gateButton;
-    let text = "Acionar portão";
-    let icon = "key-outline";
-
-    switch (gateState) {
-      case 'FECHADO':
-        text = "Portão Fechado";
-        buttonStyle = [styles.gateButton, { backgroundColor: '#22c55e' }]; // Verde
-        icon = "lock-closed-outline";
-        break;
-      case 'ABERTO':
-        buttonStyle = [styles.gateButton, { backgroundColor: '#ef4444' }]; // Vermelho
-        text = "Portão Aberto";
-        icon = "lock-open-outline";
-        break;
-      case 'EM_MOVIMENTO':
-        buttonStyle = [styles.gateButton, { backgroundColor: '#f59e0b' }]; // Amarelo
-        text = "Movendo...";
-        icon = "swap-horizontal-outline";
-        break;
-      case 'ACIONADO':
-        buttonStyle = [styles.gateButton, { backgroundColor: '#6b7280' }]; // Cinza
-        text = "Acionado";
-        icon = "hourglass-outline";
-        break;
-      default: // undefined, null, ou outro estado -> Sincronizando
-        buttonStyle = [styles.gateButton, { backgroundColor: '#6b7280' }]; // Cinza por padrão
-        text = "Sincronizando...";
-        icon = "cloud-download-outline";
-        break;
+  const verifyPassword = () => {
+    if (passwordInput === '8136') {
+      setPasswordModalVisible(false);
+      navigation.navigate('Settings');
+    } else {
+      Alert.alert('Erro', 'Senha incorreta');
+      setPasswordInput('');
     }
+  };
+
+  // Configura o botão de engrenagem no topo direito
+  useLayoutEffect(() => {
+    navigation.setOptions({
+      headerRight: () => (
+        <TouchableOpacity onPress={handleSettingsPress} style={{ marginRight: 15 }}>
+          <Ionicons name="settings-outline" size={24} color={theme.colors.text} />
+        </TouchableOpacity>
+      ),
+    });
+  }, [navigation, theme, appMode]);
+
+  // --- FASE 4.2 (Visual Clássico Restaurado): Botão Colorido ---
+  const renderAutomationSection = () => {
+    if (!devicesById) return null;
+
+    // 1. Filtra apenas dispositivos que são "ATUADORES"
+    const actuators = Object.values(devicesById).filter(device => {
+      const typeConfig = deviceTypes[device.deviceType];
+      return typeConfig && typeConfig.capability === 'atuador';
+    });
+
+    if (actuators.length === 0) return null;
 
     return (
-      <View style={styles.categoryContainer}>
-        <TouchableOpacity 
-          style={[styles.categoryButton, buttonStyle]} 
-          onPress={handleGateAction}
-          activeOpacity={0.8}
-        >
-          <Text style={styles.gateStateText}>Estado do Portão</Text>
-          <Ionicons name={icon} size={48} color="#ffffff" style={styles.categoryIcon} />
-          <Text style={styles.gateButtonText}>{text}</Text>
-        </TouchableOpacity>
-      </View>
+      <>
+        {actuators.map(device => {
+          const gateState = device.gateState;
+
+          // Lógica Visual Original (Cores e Ícones)
+          let buttonStyle = {};
+          let text = "Acionar";
+          let icon = "key-outline";
+          let stateLabel = "Estado Desconhecido";
+
+          // Mapeamento idêntico ao MainScreen (14)
+          switch (gateState) {
+            case 'FECHADO':
+              text = "Portão Fechado";
+              buttonStyle = { backgroundColor: '#22c55e' }; // Verde
+              icon = "lock-closed-outline";
+              stateLabel = "Estado do Portão";
+              break;
+            case 'ABERTO':
+              buttonStyle = { backgroundColor: '#ef4444' }; // Vermelho
+              text = "Portão Aberto";
+              icon = "lock-open-outline";
+              stateLabel = "Estado do Portão";
+              break;
+            case 'EM_MOVIMENTO':
+              buttonStyle = { backgroundColor: '#f59e0b' }; // Amarelo
+              text = "Movendo...";
+              icon = "swap-horizontal-outline";
+              stateLabel = "Operando";
+              break;
+            case 'ACIONADO':
+              buttonStyle = { backgroundColor: '#6b7280' }; // Cinza
+              text = "Acionado";
+              icon = "hourglass-outline";
+              stateLabel = "Aguarde";
+              break;
+            default:
+              // Fallback para status desconhecido/offline
+              buttonStyle = { backgroundColor: '#6b7280' }; // Cinza
+              text = "Sincronizando...";
+              icon = "cloud-download-outline";
+              stateLabel = "Conectando";
+              break;
+          }
+
+          // Função de Ação (Com Confirmação igual ao antigo)
+          const handlePress = () => {
+            const isOpening = (gateState === 'FECHADO');
+            const alertText = isOpening ? 'abrir' : 'fechar';
+            const alertTitle = isOpening ? 'ABRIR' : 'ACIONAR';
+
+            Alert.alert(
+              `Confirmar Ação`,
+              `Deseja realmente acionar o dispositivo ${device.deviceId}?`,
+              [
+                { text: "Cancelar", style: "cancel" },
+                {
+                  text: "SIM",
+                  onPress: () => {
+                    console.log(`[UI] Disparando TRIGGER para ${device.deviceId}`);
+                    enviarComando(device.deviceId, 'TRIGGER');
+                  }
+                }
+              ]
+            );
+          };
+
+          return (
+            <View key={device.deviceId} style={styles.categoryContainer}>
+              <TouchableOpacity
+                style={[styles.categoryButton, buttonStyle]}
+                onPress={handlePress}
+                activeOpacity={0.8}
+              >
+                <Text style={styles.gateStateText}>{stateLabel}</Text>
+                <Ionicons name={icon} size={48} color="#ffffff" style={styles.categoryIcon} />
+                <Text style={styles.gateButtonText}>{text}</Text>
+              </TouchableOpacity>
+            </View>
+          );
+        })}
+      </>
     );
   };
 
@@ -136,40 +192,52 @@ export default function MainScreen({ navigation, user, themeName = 'dark', appMo
     return '#22c55e';
   };
 
-  const pulseiraDevices = getDevicesByType('pulseira');
-  const detectorDevices = [...getDevicesByType('barreira'), ...getDevicesByType('microondas'), ...getDevicesByType('detector')];
-  const sensorDevices = getDevicesByType('gas_fumaca').filter(d => d.deviceId !== 'SENSOR_GAS_FUMACA');
-  const automacaoDevices = getDevicesByType('automacao');
-  const newDevices = getNewDevices();
+  // FASE 5: Consumindo o Objeto Agrupado (groupedDevices)
+  const pulseiraDevices = groupedDevices['pulseira'] || [];
+
+  const detectorDevices = [
+    ...(groupedDevices['barreira'] || []),
+    ...(groupedDevices['microondas'] || []),
+    ...(groupedDevices['detector'] || [])
+  ];
+
+  const sensorDevices = (groupedDevices['gas_fumaca'] || []).filter(d => d.deviceId !== 'SENSOR_GAS_FUMACA');
+
+  const automacaoDevices = groupedDevices['automacao'] || [];
 
   const handleRemoveType = async (deviceId) => {
     await updateDeviceType(deviceId, undefined);
   };
 
   const renderDeviceCard = (device) => {
-    const deviceType = deviceTypes.find(t => t.id === device.deviceType);
-    const typeConfig = deviceType || { name: "Sem tipo", color: "#6b7280" };
+    // CORREÇÃO: Acessamos direto pela chave (muito mais rápido)
+    const deviceType = deviceTypes[device.deviceType];
+    // Ajuste: O objeto agora usa 'label' em vez de 'name', mas vamos garantir compatibilidade
+    const typeConfig = deviceType
+      ? { name: deviceType.name, color: deviceType.color }
+      : { name: "Sem tipo", color: "#6b7280" };
+
     const hasType = !!device.deviceType;
 
     const statusText = device.connected ? 'Online' : 'Offline';
     const statusColor = device.connected ? '#22c55e' : '#6b7280';
-    
+
     const isAlertActive = !!device.lastAlertType;
-    const alertStyle = 
-        device.lastAlertType === 'PANICO' ? styles.cardPanicActive :
+    const alertStyle =
+      device.lastAlertType === 'PANICO' ? styles.cardPanicActive :
         device.lastAlertType === 'QUEDA' ? styles.cardFallActive : null;
-    
-    const alertStatusText = 
-        device.lastAlertType === 'PANICO' ? 'BOTÃO ACIONADO' :
+
+    const alertStatusText =
+      device.lastAlertType === 'PANICO' ? 'BOTÃO ACIONADO' :
         device.lastAlertType === 'QUEDA' ? 'QUEDA DETECTADA' : statusText;
 
-    const alertStatusColor = 
-        device.lastAlertType === 'PANICO' ? '#ef4444' :
+    const alertStatusColor =
+      device.lastAlertType === 'PANICO' ? '#ef4444' :
         device.lastAlertType === 'QUEDA' ? '#f59e0b' : statusColor;
 
     return (
-      <TouchableOpacity 
-        key={device.deviceId} 
+      <TouchableOpacity
+        key={device.deviceId}
         style={[styles.subCard, alertStyle]}
         onPress={isAlertActive ? () => acknowledgeAlert(device.deviceId, device.lastAlertType) : undefined}
         activeOpacity={0.8}
@@ -177,9 +245,9 @@ export default function MainScreen({ navigation, user, themeName = 'dark', appMo
         <View style={styles.deviceHeader}>
           <Text style={styles.subTitle} numberOfLines={1} ellipsizeMode="tail">{device.deviceId}</Text>
           <View style={styles.typeButtonsContainer}>
-            <TouchableOpacity 
+            <TouchableOpacity
               style={[
-                styles.typeButton, 
+                styles.typeButton,
                 { backgroundColor: typeConfig.color },
                 isAlertActive && styles.buttonDisabled
               ]}
@@ -190,7 +258,7 @@ export default function MainScreen({ navigation, user, themeName = 'dark', appMo
               <Text style={styles.typeButtonText}>{typeConfig.name}</Text>
             </TouchableOpacity>
             {hasType && (
-              <TouchableOpacity 
+              <TouchableOpacity
                 style={[styles.removeButton, isAlertActive && styles.buttonDisabled]}
                 onPress={() => !isAlertActive && handleRemoveType(device.deviceId)}
                 disabled={isAlertActive}
@@ -218,7 +286,7 @@ export default function MainScreen({ navigation, user, themeName = 'dark', appMo
             )}
             {typeof device.uptimeSec === 'number' && (
               <Text style={styles.deviceInfoText}>
-                Tempo ligado: {Math.floor(device.uptimeSec/3600)}h {Math.floor((device.uptimeSec%3600)/60)}m
+                Tempo ligado: {Math.floor(device.uptimeSec / 3600)}h {Math.floor((device.uptimeSec % 3600) / 60)}m
               </Text>
             )}
             {typeof device.rssiDbm === 'number' && (
@@ -235,7 +303,7 @@ export default function MainScreen({ navigation, user, themeName = 'dark', appMo
             )}
             {typeof device.lastSeen === 'number' && device.lastSeen > 0 && (
               <Text style={styles.deviceInfoText}>
-                Atualizado há {Math.max(0, Math.floor((Date.now() - device.lastSeen)/1000))}s
+                Atualizado há {Math.max(0, Math.floor((Date.now() - device.lastSeen) / 1000))}s
               </Text>
             )}
           </View>
@@ -266,12 +334,12 @@ export default function MainScreen({ navigation, user, themeName = 'dark', appMo
   };
 
   const renderCategoryButton = (title, iconName, devices, categoryKey, status, prependText) => {
-    const bgColor = status?.bg || theme.colors.card ;
+    const bgColor = status?.bg || theme.colors.card;
     const statusText = status?.text || null;
 
     return (
       <View style={styles.categoryContainer}>
-        <TouchableOpacity 
+        <TouchableOpacity
           style={[styles.categoryButton, { backgroundColor: bgColor }]}
           onPress={() => navigation.navigate('CategoryDevices', {
             categoryTitle: title,
@@ -299,11 +367,52 @@ export default function MainScreen({ navigation, user, themeName = 'dark', appMo
       </View>
     );
   };
-  
-  const renderServerCard = () => {
-    const statusText = connectionStatus;
-    const statusColor = connectionStatus === 'Conectado' ? '#22c55e' : connectionStatus === 'Conectando...' ? '#facc15' : '#ef4444';
 
+  const renderServerCard = () => {
+    // 1. CENÁRIO: NENHUM SERVIDOR CONFIGURADO
+    if (!serverDevice) {
+      // PROGRAMAÇÃO DEFENSIVA: Se o app ainda está tentando conectar, 
+      // mostramos um estado neutro de "Localizando" em vez de um erro crítico.
+      if (connectionStatus === 'Conectando...') {
+        return (
+          <View style={[styles.serverCard, { borderColor: theme.colors.border, borderWidth: 1 }]}>
+            <View style={[styles.serverHeaderRow, { justifyContent: 'flex-start' }]}>
+              <Ionicons name="sync-outline" size={36} color={theme.colors.muted} style={{ marginRight: 12 }} />
+              <View>
+                <Text style={[styles.serverHeader, { color: theme.colors.text }]}>Localizando Servidor...</Text>
+                <Text style={[styles.deviceInfoText, { color: theme.colors.textSecondary, fontSize: 12 }]}>
+                  Sincronizando dispositivos na rede
+                </Text>
+              </View>
+            </View>
+          </View>
+        );
+      }
+
+      // Se não está "Conectando" e mesmo assim não há serverDevice, exibe o Alerta Vermelho
+      return (
+        <View style={[styles.serverCard, { borderColor: '#ef4444', borderWidth: 1, backgroundColor: 'rgba(239, 68, 68, 0.1)' }]}>
+          <View style={[styles.serverHeaderRow, { justifyContent: 'flex-start' }]}>
+            <Ionicons name="alert-circle" size={36} color="#ef4444" style={{ marginRight: 12 }} />
+            <View>
+              <Text style={[styles.serverHeader, { color: '#ef4444' }]}>Servidor Ausente</Text>
+              <Text style={[styles.deviceInfoText, { color: theme.colors.textSecondary, fontSize: 12 }]}>
+                Selecione o tipo "Servidor" na lista abaixo
+              </Text>
+            </View>
+          </View>
+        </View>
+      );
+    }
+
+    // 2. CENÁRIO: SERVIDOR ENCONTRADO (Card Padrão com Métricas)
+    const statusText = connectionStatus;
+    // Lógica Tripla: Verde (Online) | Cinza (Carregando - Silent) | Vermelho (Offline)
+    const statusColor = connectionStatus === 'Conectado'
+      ? '#22c55e'
+      : connectionStatus === 'Conectando...'
+        ? '#9ca3af' // <--- CINZA (Status Neutro)
+        : '#ef4444';
     return (
       <TouchableOpacity
         style={styles.serverCard}
@@ -320,7 +429,7 @@ export default function MainScreen({ navigation, user, themeName = 'dark', appMo
           <View style={[styles.deviceInfoBlock, styles.serverMetricsBlock]}>
             {typeof serverDevice?.uptimeSec === 'number' && (
               <Text style={[styles.deviceInfoText, styles.serverMetricText]}>
-                Uptime: {Math.floor(serverDevice.uptimeSec/3600)}h {Math.floor((serverDevice.uptimeSec%3600)/60)}m
+                Uptime: {Math.floor(serverDevice.uptimeSec / 3600)}h {Math.floor((serverDevice.uptimeSec % 3600) / 60)}m
               </Text>
             )}
             {typeof serverDevice?.heapB === 'number' && (
@@ -337,21 +446,18 @@ export default function MainScreen({ navigation, user, themeName = 'dark', appMo
             )}
             {typeof serverDevice?.lastSeen === 'number' && serverDevice.lastSeen > 0 && (
               <Text style={[styles.deviceInfoText, styles.serverMetricText]}>
-                Atualizado há {Math.max(0, Math.floor((Date.now() - serverDevice.lastSeen)/1000))}s
+                Atualizado há {Math.max(0, Math.floor((Date.now() - serverDevice.lastSeen) / 1000))}s
               </Text>
             )}
             {typeof serverDevice?.ip === 'string' && serverDevice.ip.length > 0 && (
               <Text style={[styles.deviceInfoText, styles.serverMetricText]}>IP: {serverDevice.ip}</Text>
-            )}
-            {!serverDevice && (
-              <Text style={[styles.deviceInfoText, styles.serverMetricText]}>Nenhuma métrica disponível.</Text>
             )}
           </View>
         )}
       </TouchableOpacity>
     );
   };
-  
+
   const renderElderlyMode = () => {
     // Encontra o primeiro dispositivo de pulseira para o botão de pânico
     const pulseiraDevice = pulseiraDevices.length > 0 ? pulseiraDevices[0] : null;
@@ -366,7 +472,7 @@ export default function MainScreen({ navigation, user, themeName = 'dark', appMo
         "Tem certeza de que deseja enviar um alerta de pânico?",
         [
           { text: "Cancelar", style: "cancel" },
-          { 
+          {
             text: "SIM, SOCORRO!",
             onPress: () => enviarComando(pulseiraDevice.deviceId, 'PANICO'),
             style: "destructive"
@@ -377,9 +483,9 @@ export default function MainScreen({ navigation, user, themeName = 'dark', appMo
 
     return (
       <View style={styles.containerelderly}>
-      {renderGateButton()}
-        <TouchableOpacity 
-          style={styles.panicButton} 
+        {renderAutomationSection()}
+        <TouchableOpacity
+          style={styles.panicButton}
           onPress={handlePanicPress}
           activeOpacity={0.8}
         >
@@ -396,7 +502,7 @@ export default function MainScreen({ navigation, user, themeName = 'dark', appMo
       <StatusBar barStyle={themeName === 'light' ? 'dark-content' : 'light-content'} />
       <ConnectionStatusBanner status={connectionStatus} />
 
-      <ScrollView 
+      <ScrollView
         style={styles.scrollView}
         contentContainerStyle={appMode === 'elderly' ? styles.elderlyScrollContent : styles.scrollContent}
         showsVerticalScrollIndicator={false}
@@ -406,7 +512,7 @@ export default function MainScreen({ navigation, user, themeName = 'dark', appMo
         ) : (
           <>
             {renderServerCard()}
-            {renderGateButton()}
+            {renderAutomationSection()}
             {newDevices.length > 0 && (
               <View style={styles.newDevicesSection}>
                 <View style={styles.newDevicesHeaderRow}>
@@ -488,7 +594,7 @@ export default function MainScreen({ navigation, user, themeName = 'dark', appMo
               style={styles.alertButton}
               onPress={() => {
                 setShowDisconnectModal(false);
-                try { requestSystemBroadcast?.(); } catch (e) {}
+                try { requestSystemBroadcast?.(); } catch (e) { }
               }}
             >
               <Text style={styles.alertButtonText}>OK</Text>
@@ -497,11 +603,54 @@ export default function MainScreen({ navigation, user, themeName = 'dark', appMo
         </View>
       </Modal>
 
+      {/* Modal de Senha para Configurações */}
+      <Modal
+        visible={passwordModalVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setPasswordModalVisible(false)}
+      >
+        <View style={styles.alertOverlay}>
+          <View style={styles.alertBox}>
+            <Text style={styles.alertTitle}>Área Restrita</Text>
+            <Text style={styles.alertMessage}>Digite a senha do administrador:</Text>
+
+            <TextInput
+              style={styles.passwordInput}
+              value={passwordInput}
+              onChangeText={setPasswordInput}
+              keyboardType="numeric"
+              maxLength={4}
+              secureTextEntry
+              placeholder="Senha"
+              placeholderTextColor="#999"
+              autoFocus
+            />
+
+            <View style={{ flexDirection: 'row', justifyContent: 'flex-end', gap: 10, marginTop: 10 }}>
+              <TouchableOpacity
+                style={[styles.alertButton, { backgroundColor: '#666' }]}
+                onPress={() => setPasswordModalVisible(false)}
+              >
+                <Text style={styles.alertButtonText}>Cancelar</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={styles.alertButton}
+                onPress={verifyPassword}
+              >
+                <Text style={styles.alertButtonText}>Entrar</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
       <DeviceTypeSelector
         visible={typeSelectorVisible}
         onClose={() => setTypeSelectorVisible(false)}
         onSelectType={handleTypeSelection}
-        deviceTypes={deviceTypes}
+        deviceTypes={getDeviceTypesList()}
         deviceId={selectedDeviceId}
       />
     </View>
@@ -541,10 +690,10 @@ const createStyles = (theme) => StyleSheet.create({
   panicButton: {
     width: '60%',
     maxWidth: 220,
-    minWidth: 220,     
+    minWidth: 220,
     aspectRatio: 1,
     backgroundColor: theme.colors.danger,
-    borderRadius: 9999, // Círculo
+    borderRadius: 9999,
     justifyContent: 'center',
     alignItems: 'center',
     padding: 20,
@@ -554,7 +703,6 @@ const createStyles = (theme) => StyleSheet.create({
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.3,
     shadowRadius: 4,
-    
   },
   panicButtonText: {
     color: '#ffffff',
@@ -568,38 +716,67 @@ const createStyles = (theme) => StyleSheet.create({
     marginTop: 8,
     textAlign: 'center',
   },
-  // --- ESTILOS DO BOTÃO DE PORTÃO REORGANIZADOS ---
-  gateButton: {
-    width: '100%', 
-    paddingVertical: 20, // Padding vertical confortável
+
+  // --- ESTILOS VISUAIS RESTAURADOS (VERSÃO CLÁSSICA) ---
+  categoryContainer: {
+    width: '90%',
+    maxWidth: 400,
+    marginBottom: 20,
+  },
+  categoryButton: {
+    backgroundColor: theme.colors.card,
+    borderRadius: 16,
+    padding: 25,
     alignItems: 'center',
     justifyContent: 'center',
-    // Removed elevation/shadow duplicates since categoryButton handles it
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: theme.name === 'light' ? 0.15 : 0.3,
+    shadowRadius: 8,
+    elevation: 8,
+    position: 'relative',
+    borderWidth: 1,
+    borderColor: theme.colors.border,
   },
-  gateContent: {
+  categoryContent: {
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 8, // Espaçamento uniforme entre os elementos (Texto Topo, Ícone, Texto Botão)
   },
-  gateButtonText: {
-    color: '#ffffff',
-    fontSize: 20,
-    fontWeight: 'bold',
-    letterSpacing: 1,
+  categoryIcon: {
+    marginBottom: 12,
+  },
+  categoryTitle: {
+    ...typography.h3,
+    color: theme.colors.text,
     textAlign: 'center',
   },
+  categoryStatus: {
+    ...typography.smallStrong,
+    color: theme.colors.textSecondary,
+    marginTop: 6,
+    textAlign: 'center',
+    marginBottom: 5,
+  },
+
+  // Estilos Específicos do Portão (Texto Grande e Branco)
   gateStateText: {
     color: 'rgba(255, 255, 255, 0.9)',
     fontSize: 13,
     fontWeight: '600',
     letterSpacing: 0.5,
     textAlign: 'center',
-    // Removido position: absolute para fluir na lista
+    marginBottom: 5,
   },
-  gateIcon: {
-    marginBottom: 0, // Reset de margens se houver global
+  gateButtonText: {
+    color: '#ffffff', // Garante BRANCO
+    fontSize: 20,     // Garante GRANDE
+    fontWeight: 'bold', // Garante NEGRITO
+    letterSpacing: 1,
+    textAlign: 'center',
+    marginTop: 5,
   },
-  // ----------------------------------
+
+  // --- RESTANTE DOS ESTILOS ---
   newDevicesSection: {
     backgroundColor: theme.colors.card,
     borderRadius: 12,
@@ -664,50 +841,6 @@ const createStyles = (theme) => StyleSheet.create({
     marginBottom: 10,
     fontWeight: 'bold',
   },
-  categoryContainer: {
-    width: '90%',
-    maxWidth: 400,
-    marginBottom: 20,
-  },
-  categoryButton: {
-    backgroundColor: theme.colors.card,
-    borderRadius: 16,
-    padding: 25,
-    alignItems: 'center',
-    justifyContent: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: theme.name === 'light' ? 0.15 : 0.3,
-    shadowRadius: 8,
-    elevation: 8,
-    position: 'relative',
-    borderWidth: 1,
-    borderColor: theme.colors.border,
-    elevation: 2,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.2,
-    shadowRadius: 1.41,
-  },
-  categoryContent: {
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  categoryIcon: {
-    marginBottom: 12,
-  },
-  categoryTitle: {
-    ...typography.h3,
-    color: theme.colors.text,
-    textAlign: 'center',
-  },
-  categoryStatus: {
-    ...typography.smallStrong,
-    color: theme.colors.textSecondary,
-    marginTop: 6,
-    textAlign: 'center',
-    marginBottom: 5,
-  },
   alertBadge: {
     position: 'absolute',
     top: 10,
@@ -733,14 +866,6 @@ const createStyles = (theme) => StyleSheet.create({
     marginBottom: 10,
     borderWidth: 1,
     borderColor: theme.colors.border,
-  },
-  cardPanicActive: {
-    backgroundColor: '#4c0519',
-    borderColor: '#ef4444',
-  },
-  cardFallActive: {
-    backgroundColor: '#4a2c0d',
-    borderColor: '#f59e0b',
   },
   deviceHeader: {
     flexDirection: 'row',
@@ -864,5 +989,31 @@ const createStyles = (theme) => StyleSheet.create({
     color: '#ffffff',
     fontWeight: 'bold',
     fontSize: 14,
+  },
+  passwordInput: {
+    backgroundColor: theme.colors.background,
+    color: theme.colors.text,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+    borderRadius: 8,
+    padding: 10,
+    fontSize: 18,
+    textAlign: 'center',
+    marginBottom: 15,
+    width: '100%',
+    letterSpacing: 5,
+  },
+  sectionContainer: {
+    width: '100%',
+    alignItems: 'center',
+  },
+  sectionTitle: {
+    ...typography.h3,
+    color: theme.colors.text,
+    marginBottom: 10,
+    marginLeft: 4,
+    alignSelf: 'flex-start',
+    width: '90%',
+    maxWidth: 400,
   },
 });

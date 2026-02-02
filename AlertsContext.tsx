@@ -38,13 +38,14 @@ interface DeviceStatus {
   gateState?: string;
 }
 
-type DeviceType = "pulseira" | "barreira" | "microondas" | "detector" | "gas_fumaca" | "automacao";
+type DeviceType = "pulseira" | "barreira" | "microondas" | "detector" | "gas_fumaca" | "automacao" | "servidor" | "portao";
 
+// Interface define o formato de CADA tipo
 interface DeviceTypeConfig {
-  id: DeviceType;
   name: string;
-  color: string;
   icon: string;
+  color: string;
+  capability: 'sensor' | 'atuador' | 'sistema';
 }
 
 type ConnectionStatus =
@@ -77,9 +78,8 @@ interface AlertsContextType {
   activeAlert: ActiveAlert | null; // compat: reflete o primeiro item da fila
   dismissActiveAlert: () => void;
   devicesById: Record<string, DeviceStatus>;
-  deviceTypes: DeviceTypeConfig[];
   updateDeviceType: (deviceId: string, newType: DeviceType | undefined) => Promise<void>;
-  getDevicesByType: (type: DeviceType) => DeviceStatus[];
+  getDevicesByType: () => Record<string, DeviceStatus[]>;
   getNewDevices: () => DeviceStatus[];
   acknowledgeAlert: (deviceId: string, alertType: "PANICO" | "QUEDA") => void;
   wristbandPanicActive: boolean;
@@ -87,6 +87,8 @@ interface AlertsContextType {
   addDevice: (deviceId: string) => Promise<void>;
   removeDevice: (deviceId: string) => Promise<void>;
   enviarComando: (targetId: string, action: string) => void;
+  deviceTypes: Record<DeviceType, DeviceTypeConfig>; // Acesso rápido (Objeto)
+  getDeviceTypesList: () => ({ id: DeviceType } & DeviceTypeConfig)[]; // Para menus (Array)
   // fila
   alertsQueue: AlertItem[];
 }
@@ -115,7 +117,7 @@ export const AlertsProvider: React.FC<AlertsProviderProps> = ({
   children,
   user,
 }) => {
-  const [connectionStatus, setConnectionStatus] = useState<ConnectionStatus>("Desconectado");
+  const [connectionStatus, setConnectionStatus] = useState<ConnectionStatus>("Conectando...");
   const [sensorState, setSensorState] = useState<SensorState>("Desconectado");
   const [fallState, setFallState] = useState<FallState>("Desconectado");
   const [activeAlert, setActiveAlert] = useState<ActiveAlert | null>(null);
@@ -124,15 +126,32 @@ export const AlertsProvider: React.FC<AlertsProviderProps> = ({
   const [devicesById, setDevicesById] = useState<Record<string, DeviceStatus>>({});
   const ws = useRef<WsConnection | null>(null);
   const hasHandshaked = useRef(false);
+  const myAppId = useRef("App_Desconhecido");
 
-  const deviceTypes: DeviceTypeConfig[] = [
-    { id: "pulseira", name: "Pulseira Assistiva", color: "#3b82f6", icon: "watch-outline" },
-    { id: "barreira", name: "Barreira", color: "#10b981", icon: "shield-outline" },
-    { id: "detector", name: "Detector de Queda", color: "#ef4444", icon: "body-outline" },
-    { id: "microondas", name: "Micro-ondas", color: "#f59e0b", icon: "radio-outline" },
-    { id: "gas_fumaca", name: "Gás e Fumaça", color: "#6b7280", icon: "flame-outline" },
-    { id: "automacao", name: "Automação", color: "#8b5cf6", icon: "build-outline" },
-  ];
+  // FASE 4.1: Mapa Inteligente (Objeto para acesso rápido)
+  const deviceTypes: Record<DeviceType, DeviceTypeConfig> = {
+    // SENSORES (Monitoramento)
+    pulseira:   { name: "Pulseira de Pânico", icon: "accessibility-outline", color: "#facc15", capability: 'sensor' },
+    barreira:   { name: "Barreira IV",        icon: "scan-outline",          color: "#f87171", capability: 'sensor' },
+    microondas: { name: "Radar Micro-ondas",  icon: "radio-outline",         color: "#60a5fa", capability: 'sensor' },
+    detector:   { name: "Detector de Queda",  icon: "body-outline",          color: "#c084fc", capability: 'sensor' },
+    gas_fumaca: { name: "Sensor Gás/Fumaça",  icon: "flame-outline",         color: "#fb923c", capability: 'sensor' },
+    
+    // ATUADORES (Controle)
+    automacao:  { name: "Automação Genérica", icon: "power-outline",         color: "#8b5cf6", capability: 'atuador' },
+    portao:     { name: "Portão Eletrônico",  icon: "car-sport-outline",     color: "#10b981", capability: 'atuador' },
+    
+    // SISTEMA
+    servidor:   { name: "Servidor Central",   icon: "server-outline",        color: "#475569", capability: 'sistema' },
+  };
+
+  // --- NOVO: Converte o Objeto em Lista para menus ---
+  const getDeviceTypesList = useCallback(() => {
+    return (Object.keys(deviceTypes) as DeviceType[]).map(key => ({
+      id: key,
+      ...deviceTypes[key]
+    }));
+  }, []);
 
   const markAllDevicesAsOffline = useCallback(() => {
     setDevicesById(prev => {
@@ -150,39 +169,6 @@ export const AlertsProvider: React.FC<AlertsProviderProps> = ({
     const handlers = {
       onOpen: () => {
         setConnectionStatus("Conectado");
-        // --- NOVO: Enviar identificação com Primeiro Nome ---
-        if (ws.current?.ws) {
-            // Usa ID persistido; se não houver, só define quando houver nome/e-mail
-            (async () => {
-              try {
-                let storedId = await AsyncStorage.getItem('appDeviceId');
-                if (!storedId) {
-                  const base = (user?.name && user.name.trim().length > 0)
-                    ? user.name.trim()
-                    : (user?.email?.split('@')[0] || '');
-                  if (!base) {
-                    // Sem dados do cuidador ainda: não envia identificação agora
-                    return;
-                  }
-                  const firstNameRaw = base.split(/\s+/)[0];
-                  const firstName = firstNameRaw
-                    .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
-                    .replace(/[^A-Za-z0-9_]/g, '');
-                  if (!firstName) return;
-                  storedId = `App_${firstName}`;
-                  await AsyncStorage.setItem('appDeviceId', storedId);
-                }
-                const identificationMsg = JSON.stringify({
-                  type: 'DEVICE_STATUS',
-                  deviceId: storedId,
-                  status: 'online',
-                });
-                ws.current.ws.send(identificationMsg);
-              } catch (e) {
-                console.warn('Falha ao enviar identificação inicial:', e);
-              }
-            })();
-        }
 
         // Busca no servidor por alertas pendentes recentes (fallback quando o app estava fechado no momento do alerta)
         (async () => {
@@ -385,25 +371,51 @@ export const AlertsProvider: React.FC<AlertsProviderProps> = ({
             setSensorState(data.tipo);
           }
           // Trata mensagens diretas do servidor com status de dispositivo
+          // ------------------------------------------------------------------
+          // PROTOCOLO PADRONIZADO (MODO ESTRITO)
+          // ------------------------------------------------------------------
           else if (data.type === "DEVICE_STATUS") {
-            const statusStr = (data.status as string) || "offline";
-            const isOnline = statusStr.toLowerCase() === "online";
-            setDevicesById(prev => ({
-              ...prev,
-              [deviceId]: {
-                ...(prev[deviceId] || { deviceId }),
-                status: isOnline ? "online" : "offline",
-                connected: isOnline,
-                lastSeen: isOnline ? Date.now() : (prev[deviceId]?.lastSeen || 0),
-                uptimeSec: typeof data.uptimeSec === 'number' ? data.uptimeSec : prev[deviceId]?.uptimeSec,
-                reconnects: typeof data.reconnects === 'number' ? data.reconnects : prev[deviceId]?.reconnects,
-                batteryMv: typeof data.batteryMv === 'number' ? data.batteryMv : prev[deviceId]?.batteryMv,
-                rssiDbm: typeof data.rssiDbm === 'number' ? data.rssiDbm : prev[deviceId]?.rssiDbm,
-                tempCpuC: typeof data.tempCpuC === 'number' ? data.tempCpuC : prev[deviceId]?.tempCpuC,
-                heapB: typeof data.heapB === 'number' ? data.heapB : prev[deviceId]?.heapB,
-                ip: typeof data.ip === 'string' ? data.ip : prev[deviceId]?.ip,
-              }
-            }));
+            // Validação de Integridade: O payload é obrigatório.
+            if (!data.payload) {
+              console.warn(`⚠️ Protocolo Inválido: ${deviceId} enviou DEVICE_STATUS sem payload.`);
+              return; 
+            }
+
+            const payload = data.payload;
+            const isOnline = payload.status === "online";
+
+            setDevicesById(prev => {
+              const prevDevice = prev[deviceId];
+              
+              // Mapeamento Estrito: Protocolo Universal -> Estado do App
+              // Não há "fallback" para a raiz. A fonte da verdade é o payload.
+              return {
+                ...prev,
+                [deviceId]: {
+                  ...(prevDevice || { deviceId }), // Mantém base anterior
+                  
+                  // 1. Status Vital
+                  status: isOnline ? "online" : "offline",
+                  connected: isOnline,
+                  lastSeen: isOnline ? Date.now() : (prevDevice?.lastSeen || 0),
+                  
+                  // 2. Mapeamento de Campos (De -> Para)
+                  // O protocolo envia 'state' (genérico). O App usa 'gateState' (para UI de portão).
+                  gateState: payload.state || prevDevice?.gateState, 
+                  
+                  // 3. Telemetria Direta
+                  uptimeSec:  payload.uptimeSec,
+                  reconnects: payload.reconnects,
+                  batteryMv:  payload.batteryMv,
+                  rssiDbm:    payload.rssiDbm,
+                  ip:         payload.ip,
+                  heapB:      payload.heapB,
+                  
+                  // O firmware envia 'tempCpu'. O App espera 'tempCpuC'.
+                  tempCpuC:   payload.tempCpu,
+                }
+              };
+            });
           }
           else if (data.type === "SYSTEM_BROADCAST") {
             const broadcastData = data.data;
@@ -799,9 +811,29 @@ export const AlertsProvider: React.FC<AlertsProviderProps> = ({
     }
   };
 
-  const getDevicesByType = (type: DeviceType): DeviceStatus[] => {
-    return Object.values(devicesById).filter(device => device.deviceType === type);
-  };
+const getDevicesByType = useCallback(() => {
+    if (!devicesById) return {};
+    
+    const grouped: Record<string, DeviceStatus[]> = {};
+    
+    Object.values(devicesById).forEach(device => {
+      if (device.deviceType === 'servidor') return;
+
+      let groupKey = device.deviceType;
+      
+      if (device.deviceType === 'portao') {
+        groupKey = 'automacao';
+      }
+
+      if (!grouped[groupKey]) {
+        grouped[groupKey] = [];
+      }
+      
+      grouped[groupKey].push(device);
+    });
+    
+    return grouped;
+  }, [devicesById]);
 
   const getNewDevices = (): DeviceStatus[] => {
     return Object.values(devicesById).filter(device => {
@@ -828,9 +860,11 @@ export const AlertsProvider: React.FC<AlertsProviderProps> = ({
         type: "COMANDO",
         target: targetId,
         payload: {
-          action: action
+          action: action,
+          sender: myAppId.current
         }
       };
+
       console.log("Enviando comando:", payload);
       ws.current.ws.send(JSON.stringify(payload));
     } else {
@@ -838,24 +872,68 @@ export const AlertsProvider: React.FC<AlertsProviderProps> = ({
     }
   }, [connectionStatus]); // Dependência estável
 
-// --- HANDSHAKE V2 (MODO HUB) ---
+// --- HANDSHAKE AUTOMÁTICO & IDENTIFICAÇÃO ---
   useEffect(() => {
-    // 1. Reset da trava
+    // 1. Reset da trava se cair a conexão
     if (connectionStatus !== 'Conectado') {
       hasHandshaked.current = false;
       return;
     }
 
-    // 2. Conectou? Pede o Cache para o Servidor
+    // 2. Ao conectar, executa o protocolo de entrada
     if (connectionStatus === 'Conectado' && !hasHandshaked.current) {
-      console.log("🎮 [App] Conectado ao Hub. Solicitando Cache...");
-      hasHandshaked.current = true;
+      console.log("🎮 [Context] Conectado. Iniciando Protocolo de Identificação...");
+      hasHandshaked.current = true; // Trava imediata
 
-      // Envia APENAS o broadcast. 
-      // O Servidor (novo código) vai responder com o estado do portão.
-      requestSystemBroadcast();
+      // --- PASSO A: ENVIAR IDENTIDADE (QUEM SOU EU?) ---
+      const enviarIdentidade = async () => {
+          if (ws.current?.ws?.readyState === WebSocket.OPEN) {
+              try {
+                  // Lógica para definir o nome (Cache ou User)
+                  let storedId = await AsyncStorage.getItem('appDeviceId');
+                  if (!storedId) {
+                      const base = (user?.name && user.name.trim().length > 0) 
+                          ? user.name.trim() 
+                          : (user?.email?.split('@')[0] || 'App_Usuario');
+                      
+                      const firstName = base.split(/\s+/)[0]
+                          .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+                          .replace(/[^A-Za-z0-9_]/g, '');
+                      
+                      storedId = `App_${firstName}`;
+                      await AsyncStorage.setItem('appDeviceId', storedId);
+                  }
+                  
+                  myAppId.current = storedId;
+
+                  console.log(`🆔 Identificando como: ${storedId}`);
+                  const idMsg = JSON.stringify({
+                      type: 'DEVICE_STATUS',
+                      deviceId: storedId,
+                      payload: {
+                          status: 'online',
+                          state: 'ATIVO',
+                          platform: 'mobile',
+                          timestamp: Date.now()
+                      }
+                  });
+                  ws.current.ws.send(idMsg);
+                  
+              } catch (e) {
+                  console.error("Erro na identificação:", e);
+              }
+          }
+      };
+      
+      enviarIdentidade();
+
+      // --- PASSO B: SOLICITAR DADOS (O QUE ESTÁ ACONTECENDO?) ---
+      // Pequeno delay para garantir que o servidor processou a identidade antes de responder
+      setTimeout(() => {
+          requestSystemBroadcast();
+      }, 300);
     }
-  }, [connectionStatus, requestSystemBroadcast]);
+  }, [connectionStatus, requestSystemBroadcast, user]); // Adicionado 'user' nas dependências
 
   const value: AlertsContextType = {
     connectionStatus,
@@ -865,6 +943,7 @@ export const AlertsProvider: React.FC<AlertsProviderProps> = ({
     dismissActiveAlert,
     devicesById,
     deviceTypes,
+    getDeviceTypesList,
     updateDeviceType,
     getDevicesByType,
     getNewDevices,
