@@ -169,73 +169,7 @@ export const AlertsProvider: React.FC<AlertsProviderProps> = ({
     const handlers = {
       onOpen: () => {
         setConnectionStatus("Conectado");
-
-        // Busca no servidor por alertas pendentes recentes (fallback quando o app estava fechado no momento do alerta)
-        (async () => {
-          try {
-            const res = await fetch(`${SERVER_HTTP_BASE}/alerts?status=pending`);
-            if (res.ok) {
-              const alerts: any[] = await res.json();
-              // Filtra apenas PANICO/QUEDA, ordena por timestamp desc e enfileira todos os não vistos
-              const criticals = alerts
-                .filter(a => a.alert_type === 'PANICO' || a.alert_type === 'QUEDA')
-                .sort((a, b) => {
-                  const ta = new Date(a.timestamp).getTime();
-                  const tb = new Date(b.timestamp).getTime();
-                  return tb - ta;
-                });
-
-              const seenJson = await AsyncStorage.getItem('seenServerAlertIds');
-              const seen: Set<string> = new Set(seenJson ? JSON.parse(seenJson) : []);
-
-              const toEnqueue: AlertItem[] = [];
-              for (const it of criticals) {
-                const id = String(it.id ?? `${it.alert_type}-${it.timestamp}-${it.message}`);
-                if (seen.has(id)) continue;
-                const ts = new Date(it.timestamp).getTime();
-                if (isNaN(ts) || (Date.now() - ts) > 24 * 60 * 60 * 1000) continue;
-
-                // extrai deviceId da mensagem como fallback
-                const msg: string = it.message || '';
-                let parsedDeviceId = '';
-                const mP = msg.match(/panico acionado por:\s*([^\s]+)/i);
-                const mQ = msg.match(/Queda detectada por:\s*([^\s]+)/i);
-                if (mP && mP[1]) parsedDeviceId = mP[1];
-                else if (mQ && mQ[1]) parsedDeviceId = mQ[1];
-
-                toEnqueue.push({
-                  id,
-                  deviceId: parsedDeviceId || 'desconhecido',
-                  type: it.alert_type,
-                  message: msg,
-                  timestamp: ts,
-                });
-
-                seen.add(id);
-
-                if (parsedDeviceId) {
-                  setDevicesById(prev => ({
-                    ...prev,
-                    [parsedDeviceId]: {
-                      ...(prev[parsedDeviceId] || { deviceId: parsedDeviceId, status: 'offline', connected: false, lastSeen: 0 }),
-                      lastAlertType: it.alert_type,
-                      lastAlertAt: ts,
-                    }
-                  }));
-                }
-              }
-
-              if (toEnqueue.length) {
-                setAlertsQueue(prev => [...prev, ...toEnqueue]);
-                await AsyncStorage.setItem('seenServerAlertIds', JSON.stringify(Array.from(seen)));
-              }
-            } else {
-              console.warn('Falha ao consultar /alerts:', res.status);
-            }
-          } catch (e) {
-            console.warn('Erro de rede ao consultar /alerts:', e);
-          }
-        })();
+        
         // Ao conectar, solicita um broadcast de status para reduzir a janela de offline
         setTimeout(() => {
           if (ws.current?.ws?.readyState === WebSocket.OPEN) {
