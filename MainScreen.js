@@ -20,6 +20,7 @@ export default function MainScreen({ navigation, user, themeName = 'dark', appMo
     devicesById,
     requestSystemBroadcast,
     enviarComando,
+    triggerVirtualPanic,
     getDeviceTypesList,
   } = useAlerts();
 
@@ -39,6 +40,9 @@ export default function MainScreen({ navigation, user, themeName = 'dark', appMo
 
   // Modal de desconexão do servidor
   const [showDisconnectModal, setShowDisconnectModal] = useState(false);
+
+// --- [NOVO V51] Estado do Modal de Acessibilidade (Pânico) ---
+  const [panicModalVisible, setPanicModalVisible] = useState(false);
 
   const prevStatusRef = useRef(connectionStatus);
 
@@ -104,24 +108,28 @@ export default function MainScreen({ navigation, user, themeName = 'dark', appMo
           // Mapeamento idêntico ao MainScreen (14)
           switch (gateState) {
             case 'FECHADO':
+            case 'CLOSED':
               text = "Portão Fechado";
               buttonStyle = { backgroundColor: '#22c55e' }; // Verde
               icon = "lock-closed-outline";
               stateLabel = "Estado do Portão";
               break;
             case 'ABERTO':
+            case 'OPEN':
               buttonStyle = { backgroundColor: '#ef4444' }; // Vermelho
               text = "Portão Aberto";
               icon = "lock-open-outline";
               stateLabel = "Estado do Portão";
               break;
             case 'EM_MOVIMENTO':
+            case 'MOVING':
               buttonStyle = { backgroundColor: '#f59e0b' }; // Amarelo
               text = "Movendo...";
               icon = "swap-horizontal-outline";
               stateLabel = "Operando";
               break;
             case 'ACIONADO':
+            case 'TRIGGERED':
               buttonStyle = { backgroundColor: '#6b7280' }; // Cinza
               text = "Acionado";
               icon = "hourglass-outline";
@@ -138,25 +146,9 @@ export default function MainScreen({ navigation, user, themeName = 'dark', appMo
 
           // Função de Ação (Com Confirmação igual ao antigo)
           const handlePress = () => {
-            const isOpening = (gateState === 'FECHADO');
-            const alertText = isOpening ? 'abrir' : 'fechar';
-            const alertTitle = isOpening ? 'ABRIR' : 'ACIONAR';
-
-            Alert.alert(
-              `Confirmar Ação`,
-              `Deseja realmente acionar o dispositivo ${device.deviceId}?`,
-              [
-                { text: "Cancelar", style: "cancel" },
-                {
-                  text: "SIM",
-                  onPress: () => {
-                    console.log(`[UI] Disparando TRIGGER para ${device.deviceId}`);
-                    enviarComando(device.deviceId, 'TRIGGER');
-                  }
-                }
-              ]
-            );
-          };
+            console.log(`[UI] Disparando TRIGGER direto para ${device.deviceId}`);
+            enviarComando(device.deviceId, 'TRIGGER');
+          }
 
           return (
             <View key={device.deviceId} style={styles.categoryContainer}>
@@ -463,22 +455,7 @@ export default function MainScreen({ navigation, user, themeName = 'dark', appMo
     const pulseiraDevice = pulseiraDevices.length > 0 ? pulseiraDevices[0] : null;
 
     const handlePanicPress = () => {
-      if (!pulseiraDevice) {
-        Alert.alert("Erro", "Nenhuma pulseira de pânico configurada.");
-        return;
-      }
-      Alert.alert(
-        "Confirmar Pânico",
-        "Tem certeza de que deseja enviar um alerta de pânico?",
-        [
-          { text: "Cancelar", style: "cancel" },
-          {
-            text: "SIM, SOCORRO!",
-            onPress: () => enviarComando(pulseiraDevice.deviceId, 'PANICO'),
-            style: "destructive"
-          }
-        ]
-      );
+      setPanicModalVisible(true);
     };
 
     return (
@@ -497,10 +474,60 @@ export default function MainScreen({ navigation, user, themeName = 'dark', appMo
     );
   };
 
+  // --- [NOVO V51] Renderização do Modal de Acessibilidade ---
+  const renderPanicAccessibilityModal = () => (
+    <Modal
+      visible={panicModalVisible}
+      transparent
+      animationType="slide"
+      onRequestClose={() => setPanicModalVisible(false)}
+    >
+      <View style={styles.accOverlay}>
+        <View style={styles.accContainer}>
+          <Ionicons name="warning" size={80} color={theme.colors.danger} style={{marginBottom: 20}} />
+          
+          <Text style={styles.accTitle}>PEDIR SOCORRO?</Text>
+          <Text style={styles.accMessage}>
+            Isso enviará um alerta de emergência para todos os familiares.
+          </Text>
+
+          <View style={styles.accButtonsContainer}>
+            {/* Botão CANCELAR (Vermelho - Solicitado) */}
+            <TouchableOpacity 
+              style={[styles.accButton, { backgroundColor: '#ef4444' }]} 
+              onPress={() => setPanicModalVisible(false)}
+              activeOpacity={0.8}
+            >
+              <Ionicons name="close-circle-outline" size={40} color="#fff" />
+              <Text style={styles.accButtonText}>CANCELAR</Text>
+            </TouchableOpacity>
+
+            {/* Botão CONFIRMAR (Verde - Solicitado) */}
+            <TouchableOpacity 
+              style={[styles.accButton, { backgroundColor: '#22c55e' }]} 
+              onPress={() => {
+                setPanicModalVisible(false);
+                triggerVirtualPanic();
+              }}
+              activeOpacity={0.8}
+            >
+              <Ionicons name="checkmark-circle-outline" size={40} color="#fff" />
+              <Text style={styles.accButtonText}>SIM, SOCORRO!</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </View>
+    </Modal>
+  );
+
   return (
     <View style={styles.container}>
       <StatusBar barStyle={themeName === 'light' ? 'dark-content' : 'light-content'} />
       <ConnectionStatusBanner status={connectionStatus} />
+
+      {/* --- [INSERÇÃO] Injetando o Modal na Árvore de Visualização --- */}
+      {renderPanicAccessibilityModal()}
+      {/* ------------------------------------------------------------- */}
 
       <ScrollView
         style={styles.scrollView}
@@ -1015,5 +1042,57 @@ const createStyles = (theme) => StyleSheet.create({
     alignSelf: 'flex-start',
     width: '90%',
     maxWidth: 400,
+  },
+  accOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.9)', // Fundo bem escuro para foco total
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  accContainer: {
+    width: '100%',
+    backgroundColor: theme.colors.card,
+    borderRadius: 20,
+    padding: 30,
+    alignItems: 'center',
+    borderWidth: 2,
+    borderColor: theme.colors.border,
+    elevation: 10,
+  },
+  accTitle: {
+    fontSize: 32, // Fonte Gigante
+    fontWeight: '900',
+    color: theme.colors.text,
+    textAlign: 'center',
+    marginBottom: 10,
+    textTransform: 'uppercase',
+  },
+  accMessage: {
+    fontSize: 20, // Fonte Grande para leitura fácil
+    color: theme.colors.textSecondary,
+    textAlign: 'center',
+    marginBottom: 40,
+    lineHeight: 28,
+  },
+  accButtonsContainer: {
+    width: '100%',
+    gap: 20, // Espaço entre botões para evitar toque acidental
+  },
+  accButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 25, // Altura do botão aumentada
+    borderRadius: 16,
+    width: '100%',
+    elevation: 5,
+    gap: 15,
+  },
+  accButtonText: {
+    color: '#ffffff',
+    fontSize: 24, // Texto do botão gigante
+    fontWeight: 'bold',
+    letterSpacing: 1,
   },
 });

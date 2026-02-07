@@ -87,6 +87,7 @@ interface AlertsContextType {
   addDevice: (deviceId: string) => Promise<void>;
   removeDevice: (deviceId: string) => Promise<void>;
   enviarComando: (targetId: string, action: string) => void;
+  triggerVirtualPanic: () => void;
   deviceTypes: Record<DeviceType, DeviceTypeConfig>; // Acesso rápido (Objeto)
   getDeviceTypesList: () => ({ id: DeviceType } & DeviceTypeConfig)[]; // Para menus (Array)
   // fila
@@ -213,8 +214,13 @@ export const AlertsProvider: React.FC<AlertsProviderProps> = ({
             return; // Ignora mensagens sem um ID válido
           }
 
-          if (data.type === "ALERTA") {
-             if (data.sub_type === "PANICO") {
+          if (data.type === "ALERTA" || data.type === "ALERT") {
+             // Mapeamento de Subtipos (Inglês -> Lógica Interna)
+             const subType = data.sub_type;
+             const isPanic = subType === "PANICO" || subType === "PANIC";
+             const isFall = subType === "QUEDA" || subType === "FALL";
+
+             if (isPanic) {
                setDevicesById(prev => ({
                     ...prev,
                     [deviceId]: {
@@ -791,7 +797,7 @@ const getDevicesByType = useCallback(() => {
   const enviarComando = useCallback((targetId: string, action: string) => {
     if (ws.current?.ws && connectionStatus === "Conectado") {
       const payload = {
-        type: "COMANDO",
+        type: "COMMAND",
         target: targetId,
         payload: {
           action: action,
@@ -805,6 +811,72 @@ const getDevicesByType = useCallback(() => {
       console.log("Erro: Socket desconectado. Não foi possível enviar.");
     }
   }, [connectionStatus]); // Dependência estável
+
+// --- [FIX V51.1] Pânico Virtual com Identidade Robusta (Async) ---
+  const triggerVirtualPanic = useCallback(async () => {
+    // 1. Programação Defensiva: Verifica conexão
+    if (ws.current?.ws && connectionStatus === "Conectado") {
+      
+      // 2. Resolução de Identidade "Just-in-Time"
+      // Se a identidade ainda não carregou (App_Desconhecido), forçamos a geração agora.
+      let finalId = myAppId.current;
+      
+      if (!finalId || finalId === "App_Desconhecido") {
+          try {
+              // Tenta recuperar do armazenamento local primeiro
+              const stored = await AsyncStorage.getItem('appDeviceId');
+              if (stored) {
+                  finalId = stored;
+              } else {
+                  // Se não existir, gera ID baseado no usuário logado (Emergency Fallback)
+                  const baseName = user?.name ? user.name.split(' ')[0] : "Usuario";
+                  // Remove caracteres especiais para evitar quebra de protocolo
+                  const safeName = baseName.replace(/[^a-zA-Z0-9]/g, '');
+                  finalId = `App_${safeName}`;
+                  
+                  // Salva para uso futuro
+                  await AsyncStorage.setItem('appDeviceId', finalId);
+              }
+              // Atualiza a referência global
+              myAppId.current = finalId;
+          } catch (e) {
+              console.error("Erro crítico ao gerar ID de pânico:", e);
+              finalId = "App_Emergencia"; // Último recurso
+          }
+      }
+
+      // 3. Construção do Pacote V51 (ALERT / PANIC)
+      const payload = {
+        type: "ALERT", 
+        sub_type: "PANIC",
+        deviceId: finalId,
+        detalhes: {
+          local: "App Mobile (Virtual)",
+          timestamp: Date.now()
+        }
+      };
+
+      console.warn(`🚨 [PÂNICO VIRTUAL] Disparando alerta de: ${finalId}`);
+      ws.current.ws.send(JSON.stringify(payload));
+
+      // 4. Feedback Otimista (UX Imediata)
+      setWristbandPanicActive(true);
+      
+      setAlertsQueue(prev => ([
+        ...prev,
+        {
+          id: `virtual-${finalId}-PANICO-${Date.now()}`,
+          deviceId: finalId,
+          type: 'PANICO',
+          message: `Botão de pânico acionado manualmente pelo App (${finalId}).`,
+          timestamp: Date.now(),
+        }
+      ]));
+
+    } else {
+      console.error("❌ Erro: Não é possível enviar pânico (Sem Conexão).");
+    }
+  }, [connectionStatus, user]); // Adicionado 'user' como dependência vital
 
 // --- HANDSHAKE AUTOMÁTICO & IDENTIFICAÇÃO ---
   useEffect(() => {
@@ -887,6 +959,7 @@ const getDevicesByType = useCallback(() => {
     addDevice,
     removeDevice,
     enviarComando,
+    triggerVirtualPanic,
     alertsQueue,
   };
 
