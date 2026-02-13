@@ -3,18 +3,20 @@ import { useMemo } from 'react';
 import { Ionicons } from '@expo/vector-icons';
 import { getTheme, typography } from './theme';
 
-const SettingsScreen = ({ navigation, onLogout, themeName = 'dark', onChangeTheme, appMode, onChangeAppMode }) => {
+const SettingsScreen = ({ navigation, route, onLogout, themeName = 'dark', onChangeTheme }) => {
   const theme = useMemo(() => getTheme(themeName), [themeName]);
   const styles = useMemo(() => createStyles(theme), [theme]);
-  const menuItems = [
-    { title: 'Dados do Cuidador', screen: 'UserData', icon: 'person-circle-outline' },
-    { title: 'Dados do Idoso', screen: 'ElderlyData', icon: 'body-outline' },
-    { title: 'Gerenciar Usuários', screen: 'UserList', icon: 'people-outline' },
-    { title: 'Dispositivos', screen: 'DeviceRegistry', icon: 'list-outline' },
-    { title: 'Histórico de Alertas', screen: 'Logs', icon: 'file-tray-full-outline' },
-    { title: 'Sobre o Aplicativo', screen: 'About', icon: 'information-circle-outline' },
+  const user = route.params?.user;
+  const isAdmin = user?.role === 'admin';
+  const allMenuItems = [
+    { title: 'Dados do Cuidador', screen: 'UserData', icon: 'person-circle-outline', role: 'all' },
+    { title: 'Dados do Idoso', screen: 'ElderlyData', icon: 'body-outline', role: 'all' },
+    { title: 'Gerenciar Usuários', screen: 'UserList', icon: 'people-outline', role: 'admin' },
+    { title: 'Dispositivos', screen: 'DeviceRegistry', icon: 'list-outline', role: 'admin' },
+    { title: 'Histórico de Alertas', screen: 'Logs', icon: 'file-tray-full-outline', role: 'admin' },
+    { title: 'Sobre o Aplicativo', screen: 'About', icon: 'information-circle-outline', role: 'all' },
   ];
-
+  const menuItems = allMenuItems.filter(item => isAdmin || item.role === 'all');
   return (
     <ScrollView style={styles.container} contentContainerStyle={{ paddingBottom: 20 }}>
       <Text style={styles.sectionTitle}>Tema do Aplicativo</Text>
@@ -35,24 +37,6 @@ const SettingsScreen = ({ navigation, onLogout, themeName = 'dark', onChangeThem
         </TouchableOpacity>
       </View>
 
-      <Text style={styles.sectionTitle}>Modo de Exibição</Text>
-      <View style={styles.themeRow}>
-        <TouchableOpacity
-          style={[styles.themeButton, appMode === 'admin' && styles.themeButtonActive]}
-          onPress={() => onChangeAppMode && onChangeAppMode('admin')}
-        >
-          <Ionicons name="construct-outline" size={18} color={appMode === 'admin' ? theme.colors.text : theme.colors.textSecondary} style={{ marginRight: 6 }} />
-          <Text style={styles.themeButtonText}>ADMIN</Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={[styles.themeButton, appMode === 'elderly' && styles.themeButtonActive]}
-          onPress={() => onChangeAppMode && onChangeAppMode('elderly')}
-        >
-          <Ionicons name="body-outline" size={18} color={appMode === 'elderly' ? theme.colors.text : theme.colors.textSecondary} style={{ marginRight: 6 }} />
-          <Text style={styles.themeButtonText}>ELDERLY</Text>
-        </TouchableOpacity>
-      </View>
-
       <Text style={styles.sectionTitle}>Configurações</Text>
       {menuItems.map((item, index) => (
         <TouchableOpacity key={index} style={styles.menuItem} onPress={() => navigation.navigate(item.screen)}>
@@ -62,8 +46,8 @@ const SettingsScreen = ({ navigation, onLogout, themeName = 'dark', onChangeThem
         </TouchableOpacity>
       ))}
       <TouchableOpacity style={styles.logoutButton} onPress={onLogout}>
-          <Ionicons name="log-out-outline" size={24} color={theme.colors.danger} style={styles.icon} />
-          <Text style={styles.logoutText}>Sair</Text>
+        <Ionicons name="log-out-outline" size={24} color={theme.colors.danger} style={styles.icon} />
+        <Text style={styles.logoutText}>Sair</Text>
       </TouchableOpacity>
     </ScrollView>
   );

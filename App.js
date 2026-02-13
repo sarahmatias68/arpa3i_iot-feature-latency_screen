@@ -59,6 +59,10 @@ export default function App() {
           const savedUser = JSON.parse(json);
           setUser(savedUser);
         }
+        if (savedUser.role === 'elderly') {
+          setAppMode('elderly');
+          setThemeName('light'); // Geralmente melhor para idosos (Alto contraste)
+        }
         const savedTheme = await AsyncStorage.getItem('app_theme');
         if (savedTheme) setThemeName(savedTheme);
         const savedAppMode = await AsyncStorage.getItem('@app_mode');
@@ -93,8 +97,12 @@ export default function App() {
 
   const handleLoginSuccess = (userData) => {
     setUser(userData);
+    if (userData.role === 'elderly') {
+      setAppMode('elderly');
+      AsyncStorage.setItem('@app_mode', 'elderly').catch(() => { });
+    }
     // persiste sessão
-    AsyncStorage.setItem("arp_user", JSON.stringify(userData)).catch(() => {});
+    AsyncStorage.setItem("arp_user", JSON.stringify(userData)).catch(() => { });
     // se havia navegação pendente da notificação, resolve agora
     if (pendingNav) {
       try {
@@ -110,7 +118,7 @@ export default function App() {
 
   const handleLogout = () => {
     setUser(null);
-    AsyncStorage.removeItem("arp_user").catch(() => {});
+    AsyncStorage.removeItem("arp_user").catch(() => { });
   };
 
   // Resolve rota de destino com base no deviceId consultando /devices para obter deviceType
@@ -123,7 +131,7 @@ export default function App() {
         const found = items.find((it) => it.deviceId === deviceId);
         dtype = found?.deviceType;
       }
-    } catch (_) {}
+    } catch (_) { }
     if (dtype === 'gas_fumaca') {
       return { routeName: 'CategoryDevices', params: { categoryTitle: 'Sensores de Gás e Fumaça', categoryIcon: 'flame-outline', categoryKey: 'sensores', focusDeviceId: deviceId } };
     } else if (dtype === 'pulseira') {

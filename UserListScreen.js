@@ -14,6 +14,7 @@ const UserListScreen = ({ themeName = 'dark' }) => {
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [role, setRole] = useState('pending');
   const theme = useMemo(() => getTheme(themeName), [themeName]);
   const styles = useMemo(() => createStyles(theme), [theme]);
 
@@ -41,6 +42,7 @@ const UserListScreen = ({ themeName = 'dark' }) => {
     setName('');
     setEmail('');
     setPassword('');
+    setRole('pending'); // Padrão para novos
     setModalVisible(true);
   };
 
@@ -49,6 +51,9 @@ const UserListScreen = ({ themeName = 'dark' }) => {
     setName(user.name);
     setEmail(user.email);
     setPassword(''); // A senha não é exibida por segurança
+    // --- [NOVO V51] Carrega o papel atual ---
+    setRole(user.role || 'pending');
+    // ---------------------------------------
     setModalVisible(true);
   };
 
@@ -59,8 +64,8 @@ const UserListScreen = ({ themeName = 'dark' }) => {
     }
 
     const url = currentUser ? `${API_URL}/users/update` : `${API_URL}/users/add`;
-    let body = `id=${currentUser?.id || ''}&name=${encodeURIComponent(name)}&email=${encodeURIComponent(email)}&password=${encodeURIComponent(password)}`;
-    
+    let body = `id=${currentUser?.id || ''}&name=${encodeURIComponent(name)}&email=${encodeURIComponent(email)}&password=${encodeURIComponent(password)}&role=${encodeURIComponent(role)}`;
+
     try {
       const response = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body });
       const result = await response.json();
@@ -87,20 +92,22 @@ const UserListScreen = ({ themeName = 'dark' }) => {
       `Tem certeza que deseja excluir o usuário ${user.name}?`,
       [
         { text: 'Cancelar', style: 'cancel' },
-        { text: 'Excluir', style: 'destructive', onPress: async () => {
-          try {
-            const response = await fetch(`${API_URL}/users/delete`, { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body: `id=${user.id}` });
-            const result = await response.json();
-            if (result.status === 'success') {
-              Alert.alert('Sucesso', 'Usuário excluído.');
-              fetchUsers();
-            } else {
-              throw new Error(result.message || 'Falha ao excluir');
+        {
+          text: 'Excluir', style: 'destructive', onPress: async () => {
+            try {
+              const response = await fetch(`${API_URL}/users/delete`, { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body: `id=${user.id}` });
+              const result = await response.json();
+              if (result.status === 'success') {
+                Alert.alert('Sucesso', 'Usuário excluído.');
+                fetchUsers();
+              } else {
+                throw new Error(result.message || 'Falha ao excluir');
+              }
+            } catch (error) {
+              Alert.alert('Erro', error.message || 'Não foi possível excluir o usuário.');
             }
-          } catch (error) {
-            Alert.alert('Erro', error.message || 'Não foi possível excluir o usuário.');
           }
-        }},
+        },
       ]
     );
   };
@@ -117,12 +124,25 @@ const UserListScreen = ({ themeName = 'dark' }) => {
         renderItem={({ item }) => (
           <View style={styles.userItem}>
             <View style={styles.userInfo}>
-              <Text style={styles.userName}>{item.name}</Text>
+              {/* --- [CORREÇÃO DE LAYOUT] Container Row para Nome + Badge --- */}
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                <Text style={styles.userName}>{item.name}</Text>
+
+                {/* Badges de Papel */}
+                {item.role === 'admin' && <View style={[styles.badge, { backgroundColor: theme.colors.primary }]}><Text style={styles.badgeText}>ADMIN</Text></View>}
+                {item.role === 'caregiver' && <View style={[styles.badge, { backgroundColor: '#10b981' }]}><Text style={styles.badgeText}>CUIDADOR</Text></View>}
+                {item.role === 'elderly' && <View style={[styles.badge, { backgroundColor: '#f59e0b' }]}><Text style={styles.badgeText}>IDOSO</Text></View>}
+                {(item.role === 'pending' || !item.role) && <View style={[styles.badge, { backgroundColor: '#6b7280' }]}><Text style={styles.badgeText}>PENDENTE</Text></View>}
+              </View>
+              {/* ----------------------------------------------------------- */}
+
               <Text style={styles.userEmail}>{item.email}</Text>
             </View>
             <View style={styles.userActions}>
-              <TouchableOpacity onPress={() => openModalToEdit(item)}><Ionicons name="pencil" size={24} color={theme.colors.primary} /></TouchableOpacity>
-              <TouchableOpacity onPress={() => handleDelete(item)} style={{ marginLeft: 20 }} disabled={item.id === 1}>
+              <TouchableOpacity onPress={() => openModalToEdit(item)} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
+                <Ionicons name="pencil" size={24} color={theme.colors.primary} />
+              </TouchableOpacity>
+              <TouchableOpacity onPress={() => handleDelete(item)} style={{ marginLeft: 20 }} disabled={item.id === 1} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
                 <Ionicons name="trash-bin" size={24} color={item.id === 1 ? theme.colors.muted : theme.colors.danger} />
               </TouchableOpacity>
             </View>
@@ -139,11 +159,32 @@ const UserListScreen = ({ themeName = 'dark' }) => {
         <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={styles.modalContainer}>
           <View style={styles.modalContent}>
             <Text style={styles.modalTitle}>{currentUser ? 'Editar Usuário' : 'Adicionar Usuário'}</Text>
-            
+
             <TextInput style={styles.input} placeholder="Nome" value={name} onChangeText={setName} placeholderTextColor={theme.colors.muted} />
             <TextInput style={styles.input} placeholder="E-mail" value={email} onChangeText={setEmail} keyboardType="email-address" autoCapitalize="none" placeholderTextColor={theme.colors.muted} />
             <TextInput style={styles.input} placeholder={currentUser ? 'Nova Senha (opcional)' : 'Senha'} value={password} onChangeText={setPassword} secureTextEntry placeholderTextColor={theme.colors.muted} />
-            
+            {/* --- [NOVO V51] Seletor de Papel (Radio Buttons Simplificados) --- */}
+            <Text style={{ color: theme.colors.text, marginBottom: 10, fontWeight: 'bold' }}>Permissão de Acesso:</Text>
+            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 20 }}>
+              {['admin', 'caregiver', 'elderly', 'pending'].map((r) => (
+                <TouchableOpacity
+                  key={r}
+                  onPress={() => setRole(r)}
+                  style={[
+                    styles.roleButton,
+                    role === r && { backgroundColor: theme.colors.primary, borderColor: theme.colors.primary }
+                  ]}
+                >
+                  <Text style={[
+                    styles.roleButtonText,
+                    role === r && { color: '#fff' }
+                  ]}>
+                    {r === 'admin' ? 'Admin' : r === 'caregiver' ? 'Cuidador' : r === 'elderly' ? 'Idoso' : 'Pendente'}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+            {/* --------------------------------------------------------------- */}
             <View style={styles.modalActions}>
               <TouchableOpacity style={[styles.button, styles.cancelButton]} onPress={() => setModalVisible(false)}><Text style={styles.buttonText}>Cancelar</Text></TouchableOpacity>
               <TouchableOpacity style={[styles.button, styles.saveButton]} onPress={handleSave}><Text style={styles.buttonText}>Salvar</Text></TouchableOpacity>
@@ -175,6 +216,20 @@ const createStyles = (theme) => StyleSheet.create({
   cancelButton: { backgroundColor: theme.colors.border, marginRight: 10 },
   saveButton: { backgroundColor: theme.colors.primary, marginLeft: 10 },
   buttonText: { color: theme.colors.text, fontSize: 16, fontWeight: 'bold' },
+  badge: { paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4 },
+  badgeText: { color: '#fff', fontSize: 10, fontWeight: 'bold' },
+  roleButton: {
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+    backgroundColor: 'transparent',
+  },
+  roleButtonText: {
+    fontSize: 12,
+    color: theme.colors.text,
+  }
 });
 
 export default UserListScreen;

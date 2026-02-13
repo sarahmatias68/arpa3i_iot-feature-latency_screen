@@ -1,4 +1,4 @@
-import { View, Text, StyleSheet, StatusBar, TouchableOpacity, ScrollView, Modal, Alert, TextInput } from 'react-native';
+import { View, Text, StyleSheet, StatusBar, TouchableOpacity, ScrollView, Modal, Alert, TextInput, ActivityIndicator } from 'react-native';
 import { useMemo, useState, useEffect, useRef, useLayoutEffect } from 'react';
 import { Ionicons } from '@expo/vector-icons';
 import { useAlerts, SERVER_DEVICE_PATTERN } from './AlertsContext';
@@ -34,14 +34,19 @@ export default function MainScreen({ navigation, user, themeName = 'dark', appMo
   // Detecta o dispositivo do servidor central por nome (servidor/server)
   const serverDevice = useMemo(() => {
     if (!devicesById) return null;
-    // REGRA ESTRITA: Só retorna se o tipo for explicitamente 'servidor'
-    return Object.values(devicesById).find(d => d.deviceType === 'servidor');
+
+    return Object.values(devicesById).find(d =>
+      d.deviceType === 'servidor' ||
+      d.deviceType === 'server' ||
+      d.deviceType === 'central'
+    );
+
   }, [devicesById]);
 
   // Modal de desconexão do servidor
   const [showDisconnectModal, setShowDisconnectModal] = useState(false);
 
-// --- [NOVO V51] Estado do Modal de Acessibilidade (Pânico) ---
+  // --- [NOVO V51] Estado do Modal de Acessibilidade (Pânico) ---
   const [panicModalVisible, setPanicModalVisible] = useState(false);
 
   const prevStatusRef = useRef(connectionStatus);
@@ -51,36 +56,22 @@ export default function MainScreen({ navigation, user, themeName = 'dark', appMo
   const [passwordInput, setPasswordInput] = useState('');
 
   const handleSettingsPress = () => {
-    if (appMode === 'elderly') {
-      // Se for idoso, pede senha
-      setPasswordInput(''); // Limpa campo anterior
-      setPasswordModalVisible(true);
-    } else {
-      // Modo normal, entra direto
-      navigation.navigate('Settings');
-    }
-  };
-
-  const verifyPassword = () => {
-    if (passwordInput === '8136') {
-      setPasswordModalVisible(false);
-      navigation.navigate('Settings');
-    } else {
-      Alert.alert('Erro', 'Senha incorreta');
-      setPasswordInput('');
-    }
+    navigation.navigate('Settings', { user });
   };
 
   // Configura o botão de engrenagem no topo direito
   useLayoutEffect(() => {
     navigation.setOptions({
       headerRight: () => (
+        // O onPress agora sempre apontará para a versão mais recente de handleSettingsPress
         <TouchableOpacity onPress={handleSettingsPress} style={{ marginRight: 15 }}>
           <Ionicons name="settings-outline" size={24} color={theme.colors.text} />
         </TouchableOpacity>
       ),
     });
-  }, [navigation, theme, appMode]);
+    // --- [CORREÇÃO REACT] Adicionado 'user' e 'handleSettingsPress' nas dependências ---
+    // Isso força o botão a ser recriado quando o usuário for carregado/autenticado.
+  }, [navigation, theme, user, handleSettingsPress]);
 
   // --- FASE 4.2 (Visual Clássico Restaurado): Botão Colorido ---
   const renderAutomationSection = () => {
@@ -98,6 +89,8 @@ export default function MainScreen({ navigation, user, themeName = 'dark', appMo
       <>
         {actuators.map(device => {
           const gateState = device.gateState;
+
+          const isSyncing = connectionStatus !== 'Conectado' || !device.connected;
 
           // Lógica Visual Original (Cores e Ícones)
           let buttonStyle = {};
@@ -156,7 +149,13 @@ export default function MainScreen({ navigation, user, themeName = 'dark', appMo
                 style={[styles.categoryButton, buttonStyle]}
                 onPress={handlePress}
                 activeOpacity={0.8}
+                disabled={isSyncing && !gateState}
               >
+                {isSyncing && (
+                  <View style={styles.syncIndicator}>
+                    <ActivityIndicator size="small" color="#ffffff" />
+                  </View>
+                )}
                 <Text style={styles.gateStateText}>{stateLabel}</Text>
                 <Ionicons name={icon} size={48} color="#ffffff" style={styles.categoryIcon} />
                 <Text style={styles.gateButtonText}>{text}</Text>
@@ -202,6 +201,7 @@ export default function MainScreen({ navigation, user, themeName = 'dark', appMo
   };
 
   const renderDeviceCard = (device) => {
+    const isAdmin = user?.role === 'admin';
     // CORREÇÃO: Acessamos direto pela chave (muito mais rápido)
     const deviceType = deviceTypes[device.deviceType];
     // Ajuste: O objeto agora usa 'label' em vez de 'name', mas vamos garantir compatibilidade
@@ -241,15 +241,19 @@ export default function MainScreen({ navigation, user, themeName = 'dark', appMo
               style={[
                 styles.typeButton,
                 { backgroundColor: typeConfig.color },
-                isAlertActive && styles.buttonDisabled
+                // Bloqueia a opacidade se tiver alerta OU se não for admin
+                (isAlertActive || !isAdmin) && styles.buttonDisabled
               ]}
-              onPress={() => !isAlertActive && showTypeSelector(device.deviceId)}
-              disabled={isAlertActive}
+              // Só abre o modal de seleção de tipo se for Admin
+              onPress={() => isAdmin && !isAlertActive && showTypeSelector(device.deviceId)}
+              disabled={isAlertActive || !isAdmin}
               hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
             >
               <Text style={styles.typeButtonText}>{typeConfig.name}</Text>
             </TouchableOpacity>
-            {hasType && (
+
+            {/* Oculta o botão de remover completamente para não-admins */}
+            {hasType && isAdmin && (
               <TouchableOpacity
                 style={[styles.removeButton, isAlertActive && styles.buttonDisabled]}
                 onPress={() => !isAlertActive && handleRemoveType(device.deviceId)}
@@ -484,8 +488,8 @@ export default function MainScreen({ navigation, user, themeName = 'dark', appMo
     >
       <View style={styles.accOverlay}>
         <View style={styles.accContainer}>
-          <Ionicons name="warning" size={80} color={theme.colors.danger} style={{marginBottom: 20}} />
-          
+          <Ionicons name="warning" size={80} color={theme.colors.danger} style={{ marginBottom: 20 }} />
+
           <Text style={styles.accTitle}>PEDIR SOCORRO?</Text>
           <Text style={styles.accMessage}>
             Isso enviará um alerta de emergência para todos os familiares.
@@ -493,8 +497,8 @@ export default function MainScreen({ navigation, user, themeName = 'dark', appMo
 
           <View style={styles.accButtonsContainer}>
             {/* Botão CANCELAR (Vermelho - Solicitado) */}
-            <TouchableOpacity 
-              style={[styles.accButton, { backgroundColor: '#ef4444' }]} 
+            <TouchableOpacity
+              style={[styles.accButton, { backgroundColor: '#ef4444' }]}
               onPress={() => setPanicModalVisible(false)}
               activeOpacity={0.8}
             >
@@ -503,8 +507,8 @@ export default function MainScreen({ navigation, user, themeName = 'dark', appMo
             </TouchableOpacity>
 
             {/* Botão CONFIRMAR (Verde - Solicitado) */}
-            <TouchableOpacity 
-              style={[styles.accButton, { backgroundColor: '#22c55e' }]} 
+            <TouchableOpacity
+              style={[styles.accButton, { backgroundColor: '#22c55e' }]}
               onPress={() => {
                 setPanicModalVisible(false);
                 triggerVirtualPanic();
@@ -531,10 +535,10 @@ export default function MainScreen({ navigation, user, themeName = 'dark', appMo
 
       <ScrollView
         style={styles.scrollView}
-        contentContainerStyle={appMode === 'elderly' ? styles.elderlyScrollContent : styles.scrollContent}
+        contentContainerStyle={user?.role === 'elderly' ? styles.elderlyScrollContent : styles.scrollContent}
         showsVerticalScrollIndicator={false}
       >
-        {appMode === 'elderly' ? (
+        {user?.role === 'elderly' ? (
           renderElderlyMode()
         ) : (
           <>
@@ -606,7 +610,6 @@ export default function MainScreen({ navigation, user, themeName = 'dark', appMo
         )}
       </ScrollView>
 
-      {/* Modal de desconexão do servidor */}
       <Modal
         visible={showDisconnectModal}
         transparent
@@ -626,49 +629,6 @@ export default function MainScreen({ navigation, user, themeName = 'dark', appMo
             >
               <Text style={styles.alertButtonText}>OK</Text>
             </TouchableOpacity>
-          </View>
-        </View>
-      </Modal>
-
-      {/* Modal de Senha para Configurações */}
-      <Modal
-        visible={passwordModalVisible}
-        transparent
-        animationType="fade"
-        onRequestClose={() => setPasswordModalVisible(false)}
-      >
-        <View style={styles.alertOverlay}>
-          <View style={styles.alertBox}>
-            <Text style={styles.alertTitle}>Área Restrita</Text>
-            <Text style={styles.alertMessage}>Digite a senha do administrador:</Text>
-
-            <TextInput
-              style={styles.passwordInput}
-              value={passwordInput}
-              onChangeText={setPasswordInput}
-              keyboardType="numeric"
-              maxLength={4}
-              secureTextEntry
-              placeholder="Senha"
-              placeholderTextColor="#999"
-              autoFocus
-            />
-
-            <View style={{ flexDirection: 'row', justifyContent: 'flex-end', gap: 10, marginTop: 10 }}>
-              <TouchableOpacity
-                style={[styles.alertButton, { backgroundColor: '#666' }]}
-                onPress={() => setPasswordModalVisible(false)}
-              >
-                <Text style={styles.alertButtonText}>Cancelar</Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                style={styles.alertButton}
-                onPress={verifyPassword}
-              >
-                <Text style={styles.alertButtonText}>Entrar</Text>
-              </TouchableOpacity>
-            </View>
           </View>
         </View>
       </Modal>
@@ -783,6 +743,15 @@ const createStyles = (theme) => StyleSheet.create({
     marginTop: 6,
     textAlign: 'center',
     marginBottom: 5,
+  },
+  syncIndicator: {
+    position: 'absolute',
+    top: 15,
+    right: 15,
+    backgroundColor: 'rgba(0,0,0,0.2)', // Fundo levemente escuro para contraste
+    borderRadius: 20,
+    padding: 4,
+    zIndex: 10,
   },
 
   // Estilos Específicos do Portão (Texto Grande e Branco)
